@@ -8,6 +8,9 @@ venv/
 # Experiment outputs
 runs/
 outputs/
+artifacts/
+*.sqlite
+*.db
 checkpoints/
 *.pth
 *.pt

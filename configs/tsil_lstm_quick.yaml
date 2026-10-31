@@ -1,0 +1,125 @@
+# TSIL scenario — real qlib CSI300 panel, LSTM backbone, LUSI loss.
+#
+# This is a compute-limited profile: 3 epochs for screening and 8 epochs for
+# full validation.  The model, data, folds, label and loss are the real TSIL
+# ones; only the training budget is reduced.  Use tsil_lstm_full.yaml for the
+# paper-scale budget.
+run:
+  name: tsil_lstm_csi300
+  domain: tsil
+  artifacts_dir: artifacts
+  db: artifacts/predicatelab.sqlite
+  rounds: 2
+
+task:
+  title: Which statistical predicates improve the TSIL invariant loss?
+  question: >-
+    Under an identical LSTM and training budget, which of the 23 upstream TSIL
+    predicates and which structured descriptor mutations improve daily
+    cross-sectional IC relative to plain MSE and the Phi_ones control?
+  hypothesis: >-
+    Predicates that encode momentum/volatility structure should align residuals
+    of similar assets and improve ranking IC, but the effect is family-specific.
+
+data:
+  provider_uri: /home/dmz-ai/zhengzengrong/FinTSB-main/qlib_data/cn_data
+  tsil_root: /home/dmz-ai/zhengzengrong/Predicate_Gen/TSIL-main
+  market: csi300
+  seq_len: 20
+  horizon: 1
+  feature_dim: 158
+  label: "Ref($close, -2) / Ref($close, -1) - 1"
+
+model:
+  seq_len: 20
+  pred_len: 1
+  e_layers: 2
+  factor: 3
+  enc_in: 158
+  c_out: 1
+  d_model: 32
+  d_ff: 16
+  n_heads: 2
+  dropout: 0.1
+  use_attn: false
+  noise_level: 0.0
+  tau_hat_init: 0.0
+  plot_show: false
+  phi_type: mse
+
+training:
+  model_type: LSTM
+  lr: 0.001
+  n_epochs: 8
+  early_stop: 3
+  smooth_steps: 3
+  max_steps_per_epoch: 300
+  batch_size: 800
+  shuffle: true
+  seed: 2025
+  screen:
+    n_epochs: 3
+    early_stop: 2
+    max_steps_per_epoch: 150
+  full:
+    n_epochs: 8
+    early_stop: 3
+    max_steps_per_epoch: 300
+
+protocol:
+  purge_days: 2
+  embargo_days: 3
+  folds:
+    - id: f2020
+      train: ["2018-01-01", "2019-12-31"]
+      valid: ["2020-01-01", "2020-12-31"]
+    - id: f2021
+      train: ["2018-01-01", "2020-12-31"]
+      valid: ["2021-01-01", "2021-12-31"]
+    - id: f2022
+      train: ["2018-01-01", "2021-12-31"]
+      valid: ["2022-01-01", "2022-12-31"]
+    - id: f2023
+      train: ["2018-01-01", "2022-12-31"]
+      valid: ["2023-01-01", "2023-12-31"]
+  holdout:
+    id: holdout_2024_2025
+    train: ["2018-01-01", "2022-12-31"]
+    valid: ["2023-01-01", "2023-12-31"]
+    test: ["2024-01-01", "2025-08-31"]
+
+evaluation:
+  name: tsil_rolling_ic
+  primary_metric: ic
+  direction: higher
+  secondary_metrics: [rank_ic, icir, mse]
+  paired: true
+  multiple_testing: benjamini-hochberg
+  notes: >-
+    daily cross-sectional IC on each validation fold; paired against the MSE
+    baseline trained with identical seeds, data and budget
+
+search:
+  generator: rule
+  generator_config:
+    seed_pool: paper6+dsl
+    mutation_top_k: 4
+    max_composite_depth: 2
+  max_candidates_per_round: 24
+  screen_folds: [f2023]
+  validation_folds: [f2020, f2021, f2022, f2023]
+  full_validation_top_k: 4
+  min_screen_effect: 0.0
+  fdr_alpha: 0.10
+  min_effect: 0.002
+  min_stability: 0.50
+  bootstrap_samples: 1000
+  bootstrap_block: 5
+  nw_lag: 5
+  seed: 2025
+
+execution:
+  workers: 1
+  gpu: "7"
+  trial_timeout_s: 3600
+  probe_timeout_s: 1200
