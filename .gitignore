@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Experiment outputs
+runs/
+outputs/
+checkpoints/
+*.pth
+*.pt
+*.ckpt
+*.log
+
+# Data
+data/
+*.csv
+*.h5
+*.npy
+*.npz
+*.pkl
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
