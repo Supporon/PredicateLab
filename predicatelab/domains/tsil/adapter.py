@@ -28,6 +28,7 @@ import numpy as np
 from predicatelab.core.adapter import CandidateGenerator, DomainAdapter, TrialRequest
 from predicatelab.core.data import assess_common
 from predicatelab.core.hashing import sha256_file, sha256_obj
+from predicatelab.core.identity import fold_content_hash, full_content_manifest
 from predicatelab.core.protocol import effective_time_fold
 from predicatelab.core.schema import (
     DataContract,
@@ -40,6 +41,10 @@ from predicatelab.domains.tsil import dsl
 from predicatelab.domains.tsil.generator import make_generator as _make_generator
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _reject_constant(value: str):
+    raise ValueError(f"non-finite JSON constant {value!r} in worker result")
 
 
 class TSILAdapter(DomainAdapter):
@@ -85,9 +90,16 @@ class TSILAdapter(DomainAdapter):
             label_window={"horizon": int(self.data_cfg.get("horizon", 1)), "unit": "trading_day",
                           "uses_future_days": 2,
                           "note": "Ref($close,-2)/Ref($close,-1)-1 needs t+1 and t+2 prices"},
+            label_dependency={
+                "expression": self.label,
+                "future_offset_trading_days": 2,
+                "calendar": "qlib calendars/day.txt",
+                "preprocessing": "CSRankNorm label, DropnaLabel, RobustZScoreNorm features per fold",
+            },
             feature_semantics={"alpha158": "158 qlib Alpha158 price-volume features"},
             universe=self.market,
             frequency="daily",
+            preprocessing_version="tsil-alpha158-csrank-v1",
             time_range=(self._calendar[0], self._calendar[-1]),
             caveats=[
                 "Survivorship/instrument membership is whatever the supplied qlib store contains.",
@@ -100,38 +112,46 @@ class TSILAdapter(DomainAdapter):
         cal = self.provider_uri / "calendars" / "day.txt"
         inst = self.provider_uri / "instruments" / f"{self.market}.txt"
         feature_files = sorted((self.provider_uri / "features").glob("*/*.bin"))
-        total_size = 0
-        max_mtime = 0
-        for f in feature_files:
-            st = f.stat()
-            total_size += st.st_size
-            max_mtime = max(max_mtime, st.st_mtime_ns)
-        sample = feature_files[:4] + feature_files[-4:] if len(feature_files) > 8 else feature_files
-        sample_hashes = {str(f.relative_to(self.provider_uri)): sha256_file(f) for f in sample}
+        rel_files = [cal.relative_to(self.provider_uri), inst.relative_to(self.provider_uri),
+                     *[f.relative_to(self.provider_uri) for f in feature_files]]
+        cache_root = Path(self.config.get("run", {}).get("artifacts_dir", "artifacts")) / "_manifests"
+        cache_path = cache_root / f"tsil_{self.market}_content_manifest.json"
+        # Full per-file SHA-256 + Merkle root.  The persisted cache is trusted
+        # only while size/mtime match; changed files are re-hashed.  A file
+        # count, mtime or a sample of files is never accepted as identity.
+        manifest = full_content_manifest(
+            self.provider_uri, rel_files, cache_path=cache_path,
+        )
+        content_root = manifest["merkle_root"]
         details = {
             "calendar_sha256": sha256_file(cal),
             "instruments_sha256": sha256_file(inst),
             "n_feature_files": len(feature_files),
-            "feature_total_size": total_size,
-            "feature_max_mtime_ns": max_mtime,
-            "sampled_feature_sha256": sample_hashes,
+            "data_manifest_hash": content_root,
+            "data_manifest_n_files": manifest["n_files"],
+            "data_manifest_cache": str(cache_path),
+            "data_manifest_generated_at": manifest["generated_at"],
             "semantics": {
                 "market": self.market,
                 "label": self.label,
                 "seq_len": self.seq_len,
                 "feature_dim": self.feature_dim,
                 "horizon": int(self.data_cfg.get("horizon", 1)),
+                "preprocessing_version": "tsil-alpha158-csrank-v1",
             },
         }
         manifest_hash = sha256_obj(details)
         return DataSnapshot(
             dataset_id=f"qlib-cn-{self.market}",
             domain="tsil",
-            manifest_method="calendar+instruments sha256 + feature-store metadata + 8 sampled file hashes",
+            manifest_method="full per-file sha256 Merkle root (calendar, instruments, all feature files)",
             manifest_hash=manifest_hash,
             path=str(self.provider_uri),
             details=details,
         )
+
+    def trading_calendar(self, config: dict[str, Any]) -> list[str]:
+        return list(self._calendar)
 
     def suitability(self, snapshot: DataSnapshot, config: dict[str, Any]) -> dict[str, Any]:
         cal_start, cal_end = self._calendar[0], self._calendar[-1]
@@ -167,39 +187,40 @@ class TSILAdapter(DomainAdapter):
         p = config.get("protocol", {})
         purge = int(p.get("purge_days", 2))
         embargo = int(p.get("embargo_days", 3))
-        folds = []
-        for row in p.get("folds", []):
+
+        def _fold(row: dict, role: str) -> FoldSpec:
             f = FoldSpec(
-                fold_id=row["id"],
+                fold_id=row["id"], role=role,
                 train_start=row["train"][0], train_end=row["train"][1],
                 valid_start=row["valid"][0], valid_end=row["valid"][1],
+                test_start=(row.get("test") or [None, None])[0],
+                test_end=(row.get("test") or [None, None])[1],
                 purge_days=int(row.get("purge_days", purge)),
                 embargo_days=int(row.get("embargo_days", embargo)),
             )
-            folds.append(effective_time_fold(f, self._calendar))
-        holdout = None
-        if p.get("holdout"):
-            row = p["holdout"]
-            h = FoldSpec(
-                fold_id=row["id"],
-                train_start=row["train"][0], train_end=row["train"][1],
-                valid_start=row["valid"][0], valid_end=row["valid"][1],
-                test_start=row["test"][0], test_end=row["test"][1],
-                role="holdout",
-                purge_days=int(row.get("purge_days", purge)),
-                embargo_days=int(row.get("embargo_days", embargo)),
-            )
-            holdout = effective_time_fold(h, self._calendar)
-            holdout = holdout.model_copy(update={"test_start": h.test_start, "test_end": h.test_end})
+            effective = effective_time_fold(f, self._calendar)
+            if role == "holdout":
+                effective = effective.model_copy(
+                    update={"test_start": f.test_start, "test_end": f.test_end}
+                )
+            return effective
+
+        folds = [_fold(row, "search") for row in p.get("folds", [])]
+        confirmation = [_fold(row, "confirmation")
+                        for row in p.get("confirmation_folds", [])]
+        holdout = _fold(p["holdout"], "holdout") if p.get("holdout") else None
         return ExperimentProtocol(
             task_id=f"task-tsil-{self.market}",
             domain="tsil",
             primary_metric=self._evaluation.primary_metric,
             direction=self._evaluation.direction,
             folds=folds,
+            confirmation_folds=confirmation,
+            confirmation_kind=str(p.get("confirmation_kind", "time_forward")),
             holdout_fold=holdout,
             baseline_variant="baseline:mse",
             control_variant="control:ones",
+            control_variants=[str(x) for x in p.get("control_variants", [])],
             seeds=[int(x) for x in config.get("seeds", [config.get("training", {}).get("seed", 2025)])],
             model_spec={"model_type": config.get("training", {}).get("model_type", "LSTM"),
                           "model_config": config.get("model", {})},
@@ -229,12 +250,24 @@ class TSILAdapter(DomainAdapter):
     # ----------------------------------------------------------------- probe
     def _probe_batch_path(self, snapshot: DataSnapshot, fold: FoldSpec) -> Path:
         root = Path(self.config.get("run", {}).get("artifacts_dir", "artifacts")) / "_probe_batches"
-        return root / snapshot.snapshot_id / f"{fold.fold_id}.npz"
+        identity = sha256_obj({
+            "data_manifest": snapshot.details.get("data_manifest_hash", snapshot.manifest_hash),
+            "snapshot": snapshot.manifest_hash,
+            "label": self.label,
+            "preprocessing": "tsil-alpha158-csrank-v1",
+            "fold": fold.model_dump(mode="json"),
+            "fold_hash": fold_content_hash(fold),
+            "seq_len": self.seq_len,
+        })[:24]
+        return root / identity / f"{fold.fold_id}.npz"
 
     def _ensure_probe_batch(self, snapshot: DataSnapshot, fold: FoldSpec) -> Path:
         path = self._probe_batch_path(snapshot, fold)
         if path.exists():
             return path
+        result_path = path.with_suffix(".result.json")
+        if result_path.exists():
+            result_path.unlink()
         job = {
             "mode": "probe_batch",
             "provider_uri": str(self.provider_uri),
@@ -247,11 +280,16 @@ class TSILAdapter(DomainAdapter):
             "gpu": None,
             "calendar_path": str(self.provider_uri / "calendars" / "day.txt"),
             "output_path": str(path),
-            "result_path": str(path.with_suffix(".result.json")),
+            "result_path": str(result_path),
         }
-        self._run_worker(job, workdir=path.parent, timeout=int(self.config.get("execution", {}).get("probe_timeout_s", 900)))
-        if not path.exists():
-            raise RuntimeError(f"probe batch was not produced: {path}")
+        result = self._run_worker(
+            job, workdir=path.parent,
+            timeout=int(self.config.get("execution", {}).get("probe_timeout_s", 900)),
+        )
+        if result.get("status") != "success" or not path.exists():
+            raise RuntimeError(
+                f"probe batch failed ({result.get('status')}): {result.get('error')}"
+            )
         return path
 
     def probe(self, descriptor: dict[str, Any], fold: FoldSpec, snapshot: DataSnapshot,
@@ -315,8 +353,14 @@ class TSILAdapter(DomainAdapter):
 
     def _run_worker(self, job: dict[str, Any], workdir: Path, timeout: int) -> dict[str, Any]:
         workdir.mkdir(parents=True, exist_ok=True)
+        result_path = Path(job["result_path"])
+        # Never let an earlier attempt's result.json be read as this attempt's
+        # output, regardless of the process exit code.
+        if result_path.exists():
+            result_path.unlink()
         job_path = workdir / "job.json"
-        job_path.write_text(json.dumps(job, indent=2), encoding="utf-8")
+        from predicatelab.core.identity import atomic_write_text, strict_json_dumps
+        atomic_write_text(job_path, strict_json_dumps(job))
         env = dict(os.environ)
         env["PYTHONPATH"] = str(REPO_ROOT) + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
         log_path = workdir / "worker.log"
@@ -329,18 +373,50 @@ class TSILAdapter(DomainAdapter):
         except subprocess.TimeoutExpired:
             return {"status": "failed", "error": f"worker timed out after {timeout}s", "metrics": {},
                     "metric_series": {}, "duration_s": float(timeout)}
-        result_path = Path(job["result_path"])
+        tail = log_path.read_text(encoding="utf-8", errors="replace")[-3000:] if log_path.exists() else ""
+        if proc.returncode != 0:
+            # A nonzero exit code is authoritative.  A freshly written result
+            # (the stale file was removed above) may explain the failure, but it
+            # can never be promoted to success.
+            diag: dict[str, Any] = {}
+            if result_path.exists():
+                try:
+                    diag = json.loads(result_path.read_text(encoding="utf-8"),
+                                      parse_constant=_reject_constant)
+                except Exception:
+                    diag = {}
+            return {"status": "failed",
+                    "error": (f"worker exited rc={proc.returncode}; "
+                              f"reported={diag.get('status')!r} {diag.get('error') or ''}\n{tail}"),
+                    "metrics": diag.get("metrics", {}),
+                    "metric_series": diag.get("metric_series", {}),
+                    "duration_s": diag.get("duration_s", 0.0),
+                    "worker": {"returncode": proc.returncode, "job": str(job_path),
+                               "log": str(log_path), "reported_status": diag.get("status")}}
         if not result_path.exists():
-            tail = log_path.read_text(encoding="utf-8", errors="replace")[-3000:] if log_path.exists() else ""
-            return {"status": "failed", "error": f"worker produced no result (rc={proc.returncode})\n{tail}",
-                    "metrics": {}, "metric_series": {}, "duration_s": 0.0}
-        result = json.loads(result_path.read_text(encoding="utf-8"))
+            return {"status": "failed",
+                    "error": f"worker produced no result (rc={proc.returncode})\n{tail}",
+                    "metrics": {}, "metric_series": {}, "duration_s": 0.0,
+                    "worker": {"returncode": proc.returncode, "job": str(job_path),
+                               "log": str(log_path)}}
+        try:
+            result = json.loads(result_path.read_text(encoding="utf-8"), parse_constant=_reject_constant)
+        except Exception as exc:
+            return {"status": "failed", "error": f"malformed worker result: {exc}\n{tail}",
+                    "metrics": {}, "metric_series": {}, "duration_s": 0.0,
+                    "worker": {"returncode": proc.returncode, "job": str(job_path),
+                               "log": str(log_path)}}
         result.setdefault("worker", {})
         result["worker"].update({"returncode": proc.returncode, "job": str(job_path), "log": str(log_path)})
         return result
 
     def run_trial(self, request: TrialRequest) -> dict[str, Any]:
-        variant = {"baseline": "baseline", "control": "control"}.get(request.variant, "candidate")
+        if request.variant == "candidate":
+            variant = "candidate"
+        elif request.variant == "baseline":
+            variant = "baseline"
+        else:
+            variant = "control"
         job = {
             "mode": "trial",
             "provider_uri": str(self.provider_uri),
@@ -348,6 +424,7 @@ class TSILAdapter(DomainAdapter):
             "data": self._data_payload(),
             "fold": request.fold.model_dump(mode="json"),
             "variant": variant,
+            "control_kind": request.control_kind or ("ones" if variant == "control" else ""),
             "descriptor": request.descriptor if variant == "candidate" else {},
             "seed": request.seed,
             "training": request.training_config,
@@ -357,6 +434,16 @@ class TSILAdapter(DomainAdapter):
             "gpu": self.config.get("execution", {}).get("gpu", "0"),
             "calendar_path": str(self.provider_uri / "calendars" / "day.txt"),
             "result_path": str(Path(request.workdir) / "result.json"),
+            "identity": {
+                "run_id": request.run_id, "phase": request.phase,
+                "config_hash": request.config_hash,
+                "snapshot_hash": request.snapshot_hash,
+                "data_manifest_hash": request.data_manifest_hash,
+                "label_spec_hash": request.label_spec_hash,
+                "label_expression": request.label_expression,
+                "label_offset": request.label_offset,
+                "attempt": request.attempt,
+            },
         }
         timeout = int(self.config.get("execution", {}).get("trial_timeout_s", 3600))
         return self._run_worker(job, Path(request.workdir), timeout=timeout)

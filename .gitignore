@@ -9,6 +9,7 @@ venv/
 runs/
 outputs/
 artifacts/
+artifacts_*/
 *.sqlite
 *.db
 checkpoints/

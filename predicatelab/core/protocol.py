@@ -67,30 +67,68 @@ def effective_time_fold(fold: FoldSpec, calendar: Sequence[date | str]) -> FoldS
     )
 
 
-def validate_protocol(folds: Sequence[FoldSpec], holdout: FoldSpec | None) -> None:
-    """Static checks that catch accidental leakage in a protocol definition."""
-    ids = [f.fold_id for f in folds]
+def validate_protocol(
+    folds: Sequence[FoldSpec],
+    holdout: FoldSpec | None,
+    confirmation_folds: Sequence[FoldSpec] = (),
+    *,
+    label_future_offset: int | None = None,
+) -> None:
+    """Static checks that catch accidental leakage in a protocol definition.
+
+    V1.1 makes two previously silent leaks hard failures:
+
+    * ``purge_days=0`` on a temporal fold is rejected outright -- the later
+      label-window check cannot repair a protocol that deliberately keeps the
+      train tail;
+    * confirmation folds must be temporally later than every discovery fold;
+      the same dates may never serve as both screen and independent check.
+    """
+    folds = list(folds)
+    confirmation_folds = list(confirmation_folds)
+    ids = [f.fold_id for f in [*folds, *confirmation_folds]]
     if len(ids) != len(set(ids)):
         raise ProtocolViolation("duplicate fold_id in protocol")
     for f in folds:
         if f.role != "search":
             raise ProtocolViolation(f"fold {f.fold_id} in search list has role={f.role!r}")
+    for f in confirmation_folds:
+        if f.role != "confirmation":
+            raise ProtocolViolation(
+                f"confirmation fold {f.fold_id} has role={f.role!r}; expected 'confirmation'"
+            )
     if holdout is not None:
         if holdout.fold_id in ids:
-            raise ProtocolViolation("holdout fold must not appear in search folds")
+            raise ProtocolViolation("holdout fold must not appear in search/confirmation folds")
         if holdout.role != "holdout":
             raise ProtocolViolation("holdout fold must have role='holdout'")
-    time_folds = [f for f in folds if f.kind == "time"]
+    if not folds:
+        raise ProtocolViolation("protocol has no discovery folds")
+
+    all_folds = [*folds, *confirmation_folds]
+    time_folds = [f for f in all_folds if f.kind == "time"]
     for f in time_folds:
         if not (f.train_start and f.train_end and f.valid_start and f.valid_end):
             raise ProtocolViolation(f"fold {f.fold_id}: incomplete time period")
+        if f.purge_days < 1:
+            raise ProtocolViolation(
+                f"fold {f.fold_id}: purge_days={f.purge_days} is not allowed; a forward-looking "
+                "label needs at least one purged trading day (no natural-day substitution)"
+            )
+        if label_future_offset is not None and f.purge_days < int(label_future_offset):
+            raise ProtocolViolation(
+                f"fold {f.fold_id}: purge_days={f.purge_days} is smaller than the label's "
+                f"{label_future_offset} future trading-day dependency"
+            )
+        if f.embargo_days < 0:
+            raise ProtocolViolation(f"fold {f.fold_id}: negative embargo_days")
         if _as_date(f.train_end) >= _as_date(f.valid_start):
             raise ProtocolViolation(f"fold {f.fold_id}: train_end must precede valid_start")
         if _as_date(f.train_start) > _as_date(f.train_end):
             raise ProtocolViolation(f"fold {f.fold_id}: train_start after train_end")
         if _as_date(f.valid_start) > _as_date(f.valid_end):
             raise ProtocolViolation(f"fold {f.fold_id}: valid_start after valid_end")
-    # search validation periods must not overlap each other
+    # no validation period may overlap another (discovery or confirmation)
     ordered = sorted(time_folds, key=lambda f: _as_date(f.valid_start))
     for prev, cur in zip(ordered, ordered[1:]):
         if _as_date(cur.valid_start) <= _as_date(prev.valid_end):
@@ -98,43 +136,83 @@ def validate_protocol(folds: Sequence[FoldSpec], holdout: FoldSpec | None) -> No
                 f"validation periods overlap: {prev.fold_id} {prev.valid_start}..{prev.valid_end} "
                 f"and {cur.fold_id} {cur.valid_start}..{cur.valid_end}"
             )
+    # confirmation must use later data than every discovery fold
+    search_time = [f for f in folds if f.kind == "time" and f.valid_end]
+    if confirmation_folds and search_time:
+        last_search_end = max(_as_date(f.valid_end) for f in search_time)
+        for f in confirmation_folds:
+            if not f.valid_start:
+                raise ProtocolViolation(f"confirmation fold {f.fold_id}: missing valid_start")
+            if _as_date(f.valid_start) <= last_search_end:
+                raise ProtocolViolation(
+                    f"confirmation fold {f.fold_id} starts {f.valid_start} on/before the last "
+                    f"discovery validation end {last_search_end}; it would not be independent"
+                )
     if holdout is not None and holdout.test_start:
         for f in time_folds:
             if _as_date(f.valid_end) >= _as_date(holdout.test_start):
                 raise ProtocolViolation(
                     f"fold {f.fold_id} validation reaches into holdout (starts {holdout.test_start})"
                 )
+        if holdout.kind == "time" and holdout.purge_days < 1:
+            raise ProtocolViolation(
+                f"holdout {holdout.fold_id}: purge_days={holdout.purge_days} is not allowed"
+            )
 
 
 @dataclass
 class HoldoutGuard:
-    """Only the finalize step may unlock the holdout.
+    """Stage-aware fold access control.
 
-    Search code holds an instance with ``frozen_manifest=None``; every attempt
-    to read a holdout fold raises :class:`ProtocolViolation`, which the engine
-    records as a BLOCKED evidence item rather than crashing the whole run.
+    Search/discovery code may only read discovery folds.  Confirmation folds are
+    readable only with ``purpose='confirmation'`` and only after the candidate
+    family was frozen; the holdout is readable only through ``finalize`` after
+    both a frozen manifest and an explicit ledger claim.
     """
 
     search_fold_ids: set[str]
     holdout_fold_id: str | None
     frozen_manifest_hash: str | None = None
+    confirmation_fold_ids: set[str] = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.confirmation_fold_ids is None:
+            self.confirmation_fold_ids = set()
 
     @classmethod
     def from_folds(
-        cls, search_folds: Iterable[FoldSpec], holdout: FoldSpec | None, frozen_manifest_hash: str | None = None
+        cls,
+        search_folds: Iterable[FoldSpec],
+        holdout: FoldSpec | None,
+        frozen_manifest_hash: str | None = None,
+        confirmation_folds: Iterable[FoldSpec] = (),
     ) -> "HoldoutGuard":
         return cls(
             search_fold_ids={f.fold_id for f in search_folds},
             holdout_fold_id=holdout.fold_id if holdout else None,
             frozen_manifest_hash=frozen_manifest_hash,
+            confirmation_fold_ids={f.fold_id for f in confirmation_folds},
         )
 
     def assert_fold_accessible(self, fold_id: str, purpose: str) -> None:
-        if purpose not in {"search", "finalize"}:
+        if purpose not in {"search", "confirmation", "finalize"}:
             raise ValueError(f"unknown purpose {purpose!r}")
         if fold_id in self.search_fold_ids:
             if purpose != "search":
-                raise ProtocolViolation(f"finalize tried to use search fold {fold_id}")
+                raise ProtocolViolation(
+                    f"{purpose} tried to use discovery/search fold {fold_id}"
+                )
+            return
+        if fold_id in self.confirmation_fold_ids:
+            if purpose != "confirmation":
+                raise ProtocolViolation(
+                    f"purpose={purpose!r} attempted to use confirmation fold {fold_id}; "
+                    "screen data and independent confirmation data must stay disjoint"
+                )
+            if not self.frozen_manifest_hash:
+                raise ProtocolViolation(
+                    f"confirmation fold {fold_id} requested before the candidate family was frozen"
+                )
             return
         if fold_id == self.holdout_fold_id:
             if purpose != "finalize":
@@ -152,4 +230,28 @@ class HoldoutGuard:
     def unlock(self, frozen_manifest_hash: str) -> "HoldoutGuard":
         if not frozen_manifest_hash:
             raise ProtocolViolation("empty frozen manifest")
-        return HoldoutGuard(self.search_fold_ids, self.holdout_fold_id, frozen_manifest_hash)
+        return HoldoutGuard(
+            self.search_fold_ids, self.holdout_fold_id, frozen_manifest_hash,
+            set(self.confirmation_fold_ids),
+        )
+
+
+def validate_label_isolation(
+    folds: Sequence[FoldSpec],
+    confirmation_folds: Sequence[FoldSpec],
+    holdout: FoldSpec | None,
+    calendar: Sequence[date | str],
+    label_expression: str,
+    label_window: dict,
+):
+    """Trim every partition to its label-availability boundary.
+
+    The returned folds are the *effective* folds; callers must use them instead
+    of the nominal protocol dates.  Raises ``LabelDependencyError`` on an
+    unresolved leak.  A discovery/confirmation fold ending on the same day the
+    holdout starts is rejected by the underlying module.
+    """
+    from predicatelab.core.label_window import validate_and_isolate
+
+    combined = [*folds, *confirmation_folds]
+    return validate_and_isolate(combined, holdout, calendar, label_expression, label_window)

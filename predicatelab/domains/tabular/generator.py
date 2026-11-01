@@ -28,9 +28,11 @@ KIND = {
 
 
 class TabularRuleGenerator(CandidateGenerator):
-    def __init__(self, config: dict[str, Any], feature_names: list[str], n_features: int):
+    def __init__(self, config: dict[str, Any], feature_names: list[str], n_features: int,
+                 direction: str = "higher"):
         self.feature_names = feature_names
         self.n_features = n_features
+        self.direction = direction
         self.seed_pairs = [(0, 1), (0, 2), (1, 2), (2, 3), (3, 4), (0, 13), (6, 7), (20, 21)]
 
     def _seed_templates(self) -> list[PredicateTemplate]:
@@ -77,7 +79,10 @@ class TabularRuleGenerator(CandidateGenerator):
                 if isinstance(r.get("descriptor"), dict):
                     score = r.get("effect") if r.get("effect") is not None else r.get("screen_effect") or 0.0
                     parents.append((float(score), r))
-        parents.sort(key=lambda x: -x[0])
+        # Rank by improvement in the registered direction (lower-is-better uses
+        # the most negative effects as parents).
+        sign = 1.0 if self.direction == "higher" else -1.0
+        parents.sort(key=lambda x: -sign * x[0])
         for _score, row in parents[:4]:
             desc = row["descriptor"]
             op, a = desc.get("op"), desc.get("a")
@@ -86,6 +91,9 @@ class TabularRuleGenerator(CandidateGenerator):
             parents_ids = [row.get("candidate_id", "")]
             for a2 in {max(0, a - 1), min(self.n_features - 1, a + 1)}:
                 if a2 == a:
+                    continue
+                if op in {"ratio", "product", "difference", "interaction"} and a2 == desc.get("b"):
+                    # a and b must stay distinct for pairwise operators
                     continue
                 new = {**desc, "a": a2}
                 add(_tpl(KIND[op], f"{op}(feature {a2}) mutated", new,

@@ -35,7 +35,6 @@ from predicatelab.core.schema import (
 )
 
 
-@dataclass
 class DomainNotImplemented(NotImplementedError):
     """Raised by reserved adapters (mineral, image) in V1.0."""
 
@@ -43,7 +42,7 @@ class DomainNotImplemented(NotImplementedError):
 @dataclass
 class TrialRequest:
     candidate_id: str
-    variant: str  # "candidate" | "baseline" | "control"
+    variant: str  # "candidate" | "baseline" | "control" | "control:<name>"
     descriptor: dict[str, Any]
     fold: FoldSpec
     seed: int
@@ -53,6 +52,20 @@ class TrialRequest:
     config_hash: str
     save_predictions: bool = False
     extra: dict[str, Any] = field(default_factory=dict)
+    # ---- V1.1 identity: every field below changes cached numbers -----------
+    phase: str = "discovery"  # discovery | confirmation | final
+    snapshot_hash: str = ""
+    data_manifest_hash: str = ""
+    label_spec_hash: str = ""
+    preprocessing_version: str = "v1"
+    model_spec: dict[str, Any] = field(default_factory=dict)
+    code_identity: dict[str, Any] = field(default_factory=dict)
+    environment: dict[str, Any] = field(default_factory=dict)
+    run_id: str = ""
+    attempt: int = 1
+    label_expression: str = ""
+    label_offset: int = 0
+    control_kind: str = ""
 
 
 class CandidateGenerator(ABC):
@@ -85,6 +98,14 @@ class DomainAdapter(ABC):
 
     def suitability(self, snapshot: DataSnapshot, config: dict[str, Any]) -> dict[str, Any]:
         return {"status": "ok", "checks": {}, "warnings": []}
+
+    def trading_calendar(self, config: dict[str, Any]) -> list[str] | None:
+        """Actual trading dates of the data; used for label-window isolation.
+
+        Returning ``None`` is only acceptable when the label has no forward
+        dependency.  The engine fails closed otherwise.
+        """
+        return None
 
     # -------------------------------------------------------------- protocol
     @abstractmethod
@@ -137,14 +158,35 @@ class DomainAdapter(ABC):
         raise NotImplementedError
 
     def trial_config_hash(self, request: TrialRequest) -> str:
+        """Full identity of one executable trial.
+
+        V1.0 hashed only descriptor/fold/seed/training config, so a changed data
+        snapshot, label expression, model budget, code revision or phase could
+        reuse a stale cache.  V1.1 hashes all of them; every stage uses its own
+        workdir keyed by this hash as well.
+        """
         return sha256_obj(
             {
                 "domain": self.name,
                 "variant": request.variant,
+                "control_kind": request.control_kind,
                 "descriptor": request.descriptor,
                 "fold": request.fold.model_dump(mode="json"),
+                "phase": request.phase,
                 "seed": request.seed,
+                # ``attempt`` is deliberately excluded: a retry of the same
+                # scientific configuration must find the same cache key.
                 "training_config": request.training_config,
+                "model_spec": request.model_spec,
+                "snapshot_hash": request.snapshot_hash,
+                "data_manifest_hash": request.data_manifest_hash,
+                "label_spec_hash": request.label_spec_hash,
+                "label_expression": request.label_expression,
+                "label_offset": request.label_offset,
+                "preprocessing_version": request.preprocessing_version,
+                "code_fingerprint": (request.code_identity or {}).get("dirty_fingerprint"),
+                "code_commit": (request.code_identity or {}).get("commit"),
+                "environment_fingerprint": sha256_obj(request.environment or {}),
             }
         )
 

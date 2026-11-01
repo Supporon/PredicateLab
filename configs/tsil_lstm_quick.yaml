@@ -10,6 +10,9 @@ run:
   artifacts_dir: artifacts
   db: artifacts/predicatelab.sqlite
   rounds: 2
+  require_confirmation: true
+
+seeds: [2025, 2026, 2027]
 
 task:
   title: Which statistical predicates improve the TSIL invariant loss?
@@ -79,9 +82,11 @@ protocol:
     - id: f2022
       train: ["2018-01-01", "2021-12-31"]
       valid: ["2022-01-01", "2022-12-31"]
+  confirmation_folds:
     - id: f2023
       train: ["2018-01-01", "2022-12-31"]
       valid: ["2023-01-01", "2023-12-31"]
+  confirmation_kind: time_forward
   holdout:
     id: holdout_2024_2025
     train: ["2018-01-01", "2022-12-31"]
@@ -101,13 +106,14 @@ evaluation:
 
 search:
   generator: rule
+  save_predictions: true
   generator_config:
     seed_pool: paper6+dsl
     mutation_top_k: 4
     max_composite_depth: 2
   max_candidates_per_round: 24
-  screen_folds: [f2023]
-  validation_folds: [f2020, f2021, f2022, f2023]
+  screen_folds: [f2022]
+  validation_folds: [f2020, f2021, f2022]
   full_validation_top_k: 4
   min_screen_effect: 0.0
   fdr_alpha: 0.10

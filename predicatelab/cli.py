@@ -40,27 +40,48 @@ def cmd_domains(_args) -> int:
 
 
 def cmd_validate_config(args) -> int:
+    import tempfile
+
     from predicatelab.core.engine import PredicateLabEngine
 
     cfg = load_config(args.config)
-    engine = PredicateLabEngine(cfg, run_id="run_validate")
+    tmp = Path(tempfile.mkdtemp(prefix="predicatelab_validate_"))
+    cfg = json.loads(json.dumps(cfg, default=str))
+    cfg.setdefault("run", {})
+    cfg["run"]["artifacts_dir"] = str(tmp / "artifacts")
+    cfg["run"]["db"] = str(tmp / "validate.sqlite")
+    engine = PredicateLabEngine(cfg, db_path=cfg["run"]["db"], run_id="run_validate")
     try:
         ctx = engine._build_context()
-        print(json.dumps({
+        out = {
             "domain": ctx.adapter.name,
             "protocol_hash": ctx.protocol_hash,
+            "identity_hash": ctx.context_hash,
             "snapshot": ctx.snapshot.snapshot_id,
             "snapshot_method": ctx.snapshot.manifest_method,
+            "data_manifest_hash": ctx.data_manifest_hash,
+            "label_expression": ctx.label_expression,
+            "label_offset_trading_days": ctx.label_offset,
+            "label_isolation": ctx.label_report,
             "folds": [f.fold_id for f in ctx.protocol.folds],
+            "confirmation_folds": [f.fold_id for f in ctx.protocol.confirmation_folds],
             "holdout": ctx.protocol.holdout_fold.fold_id if ctx.protocol.holdout_fold else None,
+            "effective_folds": [f.model_dump(mode="json") for f in ctx.effective_folds],
+            "effective_confirmation": [f.model_dump(mode="json") for f in ctx.effective_confirmation],
+            "effective_holdout": (ctx.effective_holdout.model_dump(mode="json")
+                                  if ctx.effective_holdout else None),
+            "seeds": ctx.protocol.seeds,
             "suitability": ctx.task.metadata.get("suitability"),
-        }, indent=2, default=str))
+        }
+        print(json.dumps(out, indent=2, default=str))
+    except Exception as exc:
+        print(json.dumps({"status": "blocked", "error": f"{type(exc).__name__}: {exc}"},
+                         indent=2, default=str), file=sys.stderr)
+        return 2
     finally:
         engine.store.close()
-        # validation should not leave a fake run behind
-        for p in (engine.artifacts / "context.json",):
-            if p.exists():
-                p.unlink()
+        import shutil
+        shutil.rmtree(tmp, ignore_errors=True)
     return 0
 
 
@@ -96,14 +117,107 @@ def cmd_report(args) -> int:
     return 0
 
 
+def cmd_freeze(args) -> int:
+    from predicatelab.core.engine import PredicateLabEngine
+
+    cfg = load_config(args.config)
+    if not args.run_id:
+        raise SystemExit("--run-id is required")
+    engine = PredicateLabEngine(cfg, db_path=args.db, run_id=args.run_id)
+    try:
+        manifest = engine.freeze_family(
+            candidate_ids=args.candidate_id or None,
+            top_k=args.top_k,
+        )
+        print(json.dumps({k: manifest[k] for k in
+                          ("family_id", "manifest_hash", "run_id", "members")},
+                         indent=2, default=str))
+        return 0
+    except Exception as exc:
+        print(f"freeze blocked: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
+    finally:
+        engine.store.close()
+
+
+def cmd_confirm(args) -> int:
+    from predicatelab.core.engine import PredicateLabEngine
+
+    cfg = load_config(args.config)
+    if not args.run_id:
+        raise SystemExit("--run-id is required")
+    engine = PredicateLabEngine(cfg, db_path=args.db, run_id=args.run_id)
+    try:
+        summary = engine.confirm(candidate_ids=args.candidate_id or None, top_k=args.top_k)
+        print(json.dumps(summary, indent=2, default=str))
+        return 0
+    except Exception as exc:
+        print(f"confirmation blocked: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
+    finally:
+        engine.store.close()
+
+
 def cmd_finalize(args) -> int:
     from predicatelab.core.engine import finalize_run
 
     cfg = load_config(args.config)
     if not args.run_id or not args.candidate_id:
         raise SystemExit("--run-id and --candidate-id are required")
-    result = finalize_run(cfg, args.run_id, args.candidate_id, db_path=args.db)
+    try:
+        result = finalize_run(cfg, args.run_id, args.candidate_id, db_path=args.db)
+    except Exception as exc:
+        print(f"finalize blocked: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
     print(json.dumps(result, indent=2, default=str))
+    return 0
+
+
+def cmd_migrate(args) -> int:
+    from predicatelab.core.store import SCHEMA_VERSION, StateStore
+
+    db = args.db or "artifacts/predicatelab.sqlite"
+    store = StateStore(db)
+    try:
+        out: dict[str, Any] = {
+            "db": db,
+            "schema_version": store.schema_version,
+            "target_version": SCHEMA_VERSION,
+            "migrations": [dict(r) for r in store._conn.execute(
+                "SELECT * FROM schema_migrations ORDER BY version")],
+            "counts": {},
+        }
+        for table in ("tasks", "snapshots", "templates", "candidates", "runs", "rounds",
+                      "trials", "trial_attempts", "evidence", "feedback", "final_evals",
+                      "holdout_access", "holdout_access_events", "frozen_families"):
+            out["counts"][table] = store._conn.execute(
+                f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        if args.backfill_artifacts:
+            out["holdout_backfill"] = store.backfill_holdout_ledger(args.backfill_artifacts)
+        print(json.dumps(out, indent=2, default=str))
+    finally:
+        store.close()
+    return 0
+
+
+def cmd_holdout_audit(args) -> int:
+    from predicatelab.core.store import StateStore
+
+    db = args.db or "artifacts/predicatelab.sqlite"
+    store = StateStore(db)
+    try:
+        rows = store.list_holdout_access()
+        print(json.dumps({
+            "n_rows": len(rows),
+            "rows": [{
+                "access_id": r["access_id"], "holdout_key": r["holdout_key"][:16],
+                "run_id": r["run_id"], "candidate_id": r["candidate_id"],
+                "status": r["status"], "purpose": r["purpose"], "origin": r["origin"],
+                "test_start": r["test_start"], "test_end": r["test_end"],
+            } for r in rows],
+        }, indent=2, default=str))
+    finally:
+        store.close()
     return 0
 
 
@@ -178,12 +292,38 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--db", default=None)
     r.set_defaults(func=cmd_report)
 
+    fz = sub.add_parser("freeze-family", help="freeze the discovery family before confirmation")
+    fz.add_argument("--config", required=True)
+    fz.add_argument("--run-id", required=True)
+    fz.add_argument("--candidate-id", action="append", default=None)
+    fz.add_argument("--top-k", type=int, default=None)
+    fz.add_argument("--db", default=None)
+    fz.set_defaults(func=cmd_freeze)
+
+    cf = sub.add_parser("confirm", help="independent confirmation on frozen family")
+    cf.add_argument("--config", required=True)
+    cf.add_argument("--run-id", required=True)
+    cf.add_argument("--candidate-id", action="append", default=None)
+    cf.add_argument("--top-k", type=int, default=None)
+    cf.add_argument("--db", default=None)
+    cf.set_defaults(func=cmd_confirm)
+
     f = sub.add_parser("finalize", help="freeze a validated candidate and evaluate on the holdout")
     f.add_argument("--config", required=True)
     f.add_argument("--run-id", required=True)
     f.add_argument("--candidate-id", required=True)
     f.add_argument("--db", default=None)
     f.set_defaults(func=cmd_finalize)
+
+    mg = sub.add_parser("migrate", help="upgrade SQLite schema in place and verify preservation")
+    mg.add_argument("--db", default=None)
+    mg.add_argument("--backfill-artifacts", default=None,
+                    help="artifacts root used to backfill historical holdout consumption")
+    mg.set_defaults(func=cmd_migrate)
+
+    ha = sub.add_parser("holdout-audit", help="list the global holdout access ledger")
+    ha.add_argument("--db", default=None)
+    ha.set_defaults(func=cmd_holdout_audit)
 
     e = sub.add_parser("evidence", help="list evidence for a run")
     e.add_argument("--config", default=None)

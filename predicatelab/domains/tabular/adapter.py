@@ -130,7 +130,7 @@ class TabularAdapter(DomainAdapter):
         self.seed = int(config.get("training", {}).get("seed", 2025))
         self._evaluation = EvaluationSpec.model_validate(
             config.get("evaluation", {
-                "name": "tabular_cv_auc",
+                "name": "tabular_cv_logloss",
                 "primary_metric": "auc",
                 "direction": "higher",
                 "secondary_metrics": ["accuracy", "log_loss"],
@@ -139,7 +139,7 @@ class TabularAdapter(DomainAdapter):
                 "notes": "repeated stratified 5-fold cross-validation on the 80% search split",
             })
         )
-        self._folds, self._holdout = self._build_folds()
+        self._folds, self._confirmation, self._holdout = self._build_folds()
 
     # ------------------------------------------------------------------ data
     def _split(self) -> tuple[np.ndarray, np.ndarray]:
@@ -151,24 +151,36 @@ class TabularAdapter(DomainAdapter):
         )
         return np.sort(pool), np.sort(hold)
 
-    def _build_folds(self) -> tuple[list[FoldSpec], FoldSpec]:
+    def _build_folds(self) -> tuple[list[FoldSpec], list[FoldSpec], FoldSpec]:
         from sklearn.model_selection import StratifiedKFold
 
         pool, hold = self._split()
         folds: list[FoldSpec] = []
+        confirmation: list[FoldSpec] = []
         n_splits = int(self.config.get("protocol", {}).get("cv_splits", 5))
         repeats = int(self.config.get("protocol", {}).get("cv_repeats", 2))
+        # The first repeat(s) drive discovery; the remaining repeats are a
+        # disjoint *resampling* confirmation family.  They are never visible to
+        # the generator and cannot be called an independent new-data check.
+        discovery_repeats = int(self.config.get("protocol", {}).get(
+            "discovery_repeats", max(1, repeats - 1)
+        ))
+        discovery_repeats = max(1, min(discovery_repeats, repeats))
         for r in range(repeats):
             skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=self.seed + r)
+            role = "search" if r < discovery_repeats else "confirmation"
+            bucket = folds if role == "search" else confirmation
             for k, (tr, va) in enumerate(skf.split(pool, self.y[pool])):
                 train_idx = pool[tr].tolist()
                 valid_idx = pool[va].tolist()
-                folds.append(FoldSpec(
-                    fold_id=f"cv_r{r}_f{k}", kind="cv", role="search",
+                bucket.append(FoldSpec(
+                    fold_id=f"cv_r{r}_f{k}", kind="cv", role=role,
                     metadata={"train_idx": train_idx, "valid_idx": valid_idx,
                               "repeat": r, "fold": k,
                               "cv_key": f"r{r}_f{k}"},
-                    notes="stratified CV fold on the 80% search split",
+                    notes=("stratified CV fold on the 80% search split"
+                           if role == "search" else
+                           "disjoint resampling confirmation repeat; same pool, not new data"),
                 ))
         holdout = FoldSpec(
             fold_id="holdout_20pct", kind="cv", role="holdout",
@@ -176,7 +188,7 @@ class TabularAdapter(DomainAdapter):
                       "test_idx": hold.tolist(), "cv_key": "holdout"},
             notes="fixed stratified 20% holdout, frozen before finalize",
         )
-        return folds, holdout
+        return folds, confirmation, holdout
 
     def data_contract(self, config: dict[str, Any]) -> DataContract:
         return DataContract(
@@ -186,10 +198,15 @@ class TabularAdapter(DomainAdapter):
             entity_key="sample",
             time_key="",
             label_definition="malignant (1) vs benign (0)",
-            label_window={"type": "static", "leakage_risk": "train/test split by sample"},
+            label_window={"type": "static", "uses_future_days": 0,
+                          "leakage_risk": "train/test split by sample"},
+            label_dependency={"future_offset_trading_days": 0,
+                              "same_sample_label": True,
+                              "note": "diagnosis label is observed with the sample; no time axis"},
             feature_semantics={name: "measurement" for name in self.feature_names},
             universe="569 samples × 30 features",
             frequency="static",
+            preprocessing_version="tabular-standard-scaler-v1",
             time_range=("", ""),
             caveats=[
                 "Static dataset: no temporal ordering; repeated stratified CV is the validation protocol.",
@@ -237,12 +254,15 @@ class TabularAdapter(DomainAdapter):
             primary_metric=self._evaluation.primary_metric,
             direction=self._evaluation.direction,
             folds=self._folds,
+            confirmation_folds=self._confirmation,
+            confirmation_kind="resampling",
             holdout_fold=self._holdout,
             baseline_variant="baseline:logreg",
             control_variant=None,
-            seeds=[self.seed],
+            seeds=[int(x) for x in self.config.get("seeds", [self.seed])],
             model_spec={"model": "LogisticRegression", "C": 1.0},
-            data_config={"dataset": "sklearn-breast-cancer", "cv_splits": 5, "cv_repeats": 2},
+            data_config={"dataset": "sklearn-breast-cancer", "cv_splits": 5,
+                         "cv_repeats": int(self.config.get("protocol", {}).get("cv_repeats", 2))},
             evaluation=self._evaluation,
         )
 
@@ -266,7 +286,8 @@ class TabularAdapter(DomainAdapter):
             raise DescriptorError(f"op {op} must have kind in {sorted(expected)}")
 
     def make_generator(self, config: dict[str, Any], policy: dict[str, Any]) -> CandidateGenerator:
-        return TabularRuleGenerator(config, self.feature_names, self.n_features)
+        return TabularRuleGenerator(config, self.feature_names, self.n_features,
+                                    direction=self._evaluation.direction)
 
     # ----------------------------------------------------------------- probe
     def probe(self, descriptor: dict[str, Any], fold: FoldSpec, snapshot: DataSnapshot,
@@ -316,7 +337,12 @@ class TabularAdapter(DomainAdapter):
             "accuracy": float(accuracy_score(yva, pred)),
             "log_loss": float(log_loss(yva, prob)),
         }
-        return metrics, fitted
+        predictions = {
+            "sample": np.asarray(valid_idx, dtype=np.int64),
+            "score": np.asarray(prob, dtype=float),
+            "label": np.asarray(yva, dtype=np.int64),
+        }
+        return metrics, fitted, predictions
 
     def run_trial(self, request: TrialRequest) -> dict[str, Any]:
         import time
@@ -326,9 +352,20 @@ class TabularAdapter(DomainAdapter):
         train_idx = np.asarray(meta["train_idx"], dtype=int)
         valid_idx = np.asarray(meta["valid_idx"], dtype=int)
         if request.variant == "candidate":
-            metrics, fitted = self._predict(request.descriptor, train_idx, valid_idx, request.seed)
+            metrics, fitted, predictions = self._predict(
+                request.descriptor, train_idx, valid_idx, request.seed)
         else:
-            metrics, fitted = self._predict(None, train_idx, valid_idx, request.seed)
+            metrics, fitted, predictions = self._predict(
+                None, train_idx, valid_idx, request.seed)
+        pred_path = ""
+        if request.save_predictions:
+            out = Path(request.workdir) / "predictions.npz"
+            out.parent.mkdir(parents=True, exist_ok=True)
+            tmp = out.with_name(out.name + ".tmp")
+            with tmp.open("wb") as fh:
+                np.savez_compressed(fh, **predictions)
+            tmp.replace(out)
+            pred_path = str(out)
         key = str(meta.get("cv_key", request.fold.fold_id))
         return {
             "status": "success",
@@ -339,7 +376,7 @@ class TabularAdapter(DomainAdapter):
             "fitted_params": fitted,
             "fit_data_hash": sha256_obj({"train_idx": train_idx.tolist(),
                                          "dataset": "sklearn-breast-cancer"}),
-            "predictions_path": "",
+            "predictions_path": pred_path,
             "duration_s": time.time() - t0,
             "error": "",
             "worker": {"variant": request.variant, "fold": request.fold.fold_id, "in_process": True},

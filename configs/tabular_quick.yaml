@@ -1,68 +1,72 @@
-# Generic tabular scenario — validates the core engine independently of TSIL.
-# Data: sklearn breast-cancer (real, bundled with scikit-learn).
 run:
   name: tabular_breast_cancer
   domain: tabular
   artifacts_dir: artifacts
   db: artifacts/predicatelab.sqlite
   rounds: 2
+  require_confirmation: true
 
+seeds: [2025, 2026, 2027]
 task:
   title: Do pairwise/simple predicates improve breast-cancer classification?
-  question: >-
-    Does adding a small, fold-fitted predicate feature to a logistic-regression
+  question: Does adding a small, fold-fitted predicate feature to a logistic-regression
     baseline improve held-out AUC under repeated stratified cross-validation?
-  hypothesis: >-
-    Non-linear pairwise interactions (ratios, products, sign agreement) carry
-    signal that a linear model on raw measurements cannot express.
-
+  hypothesis: Non-linear pairwise interactions (ratios, products, sign agreement)
+    carry signal that a linear model on raw measurements cannot express.
 training:
   seed: 2025
-
 protocol:
   cv_splits: 5
-  cv_repeats: 2
-
+  cv_repeats: 5
+  discovery_repeats: 4
+  confirmation_kind: resampling
 evaluation:
-  name: tabular_cv_auc
-  # AUC is saturated on this easy dataset (several candidates tie at 1.0 on a
-  # single fold), so log-loss is the pre-registered primary metric; AUC and
-  # accuracy stay as secondary metrics.  Lower log-loss is better.
+  name: tabular_cv_logloss
   primary_metric: log_loss
   direction: lower
-  secondary_metrics: [auc, accuracy]
+  secondary_metrics:
+  - auc
+  - accuracy
   paired: true
   multiple_testing: benjamini-hochberg
   notes: repeated stratified 5-fold CV on the 80% search split; 20% holdout frozen
-
 search:
   generator: rule
+  save_predictions: true
   generator_config:
     mutation_top_k: 4
   max_candidates_per_round: 20
-  screen_folds: [cv_r0_f0]
+  screen_folds:
+  - cv_r0_f0
   validation_folds:
-    - cv_r0_f0
-    - cv_r0_f1
-    - cv_r0_f2
-    - cv_r0_f3
-    - cv_r0_f4
-    - cv_r1_f0
-    - cv_r1_f1
-    - cv_r1_f2
-    - cv_r1_f3
-    - cv_r1_f4
+  - cv_r0_f0
+  - cv_r0_f1
+  - cv_r0_f2
+  - cv_r0_f3
+  - cv_r0_f4
+  - cv_r1_f0
+  - cv_r1_f1
+  - cv_r1_f2
+  - cv_r1_f3
+  - cv_r1_f4
+  - cv_r2_f0
+  - cv_r2_f1
+  - cv_r2_f2
+  - cv_r2_f3
+  - cv_r2_f4
+  - cv_r3_f0
+  - cv_r3_f1
+  - cv_r3_f2
+  - cv_r3_f3
+  - cv_r3_f4
   full_validation_top_k: 4
   min_screen_effect: 0.0
-  fdr_alpha: 0.10
-  # A 0.002 absolute log-loss improvement is a small but meaningful effect for
-  # this saturated task; it is fixed before any holdout access.
-  min_effect: 0.002
-  min_stability: 0.60
+  fdr_alpha: 0.1
+  min_effect: 0.0005
+  min_stability: 0.6
   bootstrap_samples: 1000
   bootstrap_block: 1
   nw_lag: 0
   seed: 2025
-
 execution:
   workers: 1

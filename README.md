@@ -1,28 +1,122 @@
-# PredicateLab
+# PredicateLab V1.1
 
-A generic predicate discovery and evidence-validation platform.
+A generic predicate discovery and evidence-validation platform built around a
+domain-neutral core and domain adapters.
 
-The engine is domain-agnostic: a domain adapter supplies a data contract, a
-candidate generator, and a fit/evaluate implementation, while the core handles
-protocol execution, statistics, and evidence bookkeeping.
+* **TSIL** (time-series): real qlib CSI300 data, the upstream TSIL LSTM/LUSI
+  loss and 23 upstream predicates plus six temporal predicates.
+* **Tabular**: an independent scikit-learn adapter that validates the core
+  engine without TSIL.
+* **Mineral prospectivity / image classification**: descriptor and adapter
+  contracts only; every execution path raises `DomainNotImplemented`.
 
-## Layout
+V1.1 is a scientific-trustworthiness release.  It makes the holdout a globally
+consumed resource, isolates labels by the real trading calendar, keys every
+cached trial by the complete experiment identity, adds run/round state
+machines with resume and atomic writes, and separates discovery, confirmation
+and one-time final evaluation.  It does **not** add new real TSIL results.
 
-- `predicatelab/core/` — domain-agnostic engine (schema, adapter, data, engine,
-  hashing, protocol, stats, store)
-- `predicatelab/domains/` — domain adapters: `tsil` (implemented end to end),
-  `tabular` (generic reference adapter), `mineral` and `image` (extension
-  contracts only)
-- `configs/` — experiment configurations
-- `docs/` — design notes
-- `tests/` — tests
-- `TSIL-main/` — upstream TSIL baseline (temporal stock investment benchmark)
-- `artifacts/` — run outputs (ignored by git)
+**Historical result, not V1.1 evidence.**  The V1.0 TSIL loop completed two
+real rounds (`run_20261031_153702`); its strongest search-fold candidate was
+evaluated once on the 2024–2025 holdout and did not confirm (paired IC
+−0.00103, p = 0.386).  Under V1.1 that holdout is marked consumed and cannot be
+read again.  Details: [TSIL results](docs/results_tsil.md),
+[tabular results](docs/results_tabular.md).
 
-## Usage
+## Quick start
 
 ```bash
-python -m predicatelab.cli domains
-python -m predicatelab.cli validate-config --config configs/tsil_lstm_quick.yaml
-python -m predicatelab.cli discover --config configs/tsil_lstm_quick.yaml
+export PYTHONPATH=.
+PY=/home/dmz-ai/miniconda3/envs/zzr_py312/bin/python
+
+# list domains
+$PY -m predicatelab.cli domains
+
+# validate data, protocol, label isolation and effective folds
+$PY -m predicatelab.cli validate-config --config configs/tsil_lstm_smoke.yaml
+
+# lifecycle: discovery -> frozen family -> confirmation -> one-time holdout
+$PY -m predicatelab.cli discover --config configs/tsil_lstm_smoke.yaml --rounds 1
+$PY -m predicatelab.cli freeze-family --config configs/tsil_lstm_smoke.yaml --run-id run_...
+$PY -m predicatelab.cli confirm --config configs/tsil_lstm_smoke.yaml --run-id run_...
+$PY -m predicatelab.cli finalize --config configs/tsil_lstm_smoke.yaml \
+    --run-id run_... --candidate-id cand_...
+
+# report, evidence and immutable bundle
+$PY -m predicatelab.cli report   --config configs/tsil_lstm_smoke.yaml --run-id run_...
+$PY -m predicatelab.cli evidence --config configs/tsil_lstm_smoke.yaml --run-id run_...
+$PY -m predicatelab.cli export   --config configs/tsil_lstm_smoke.yaml \
+    --run-id run_... --out artifacts/run_.../bundle
+
+# database migration and global holdout audit
+$PY -m predicatelab.cli migrate --db artifacts/predicatelab.sqlite \
+    --backfill-artifacts artifacts
+$PY -m predicatelab.cli holdout-audit --db artifacts/predicatelab.sqlite
+
+# reserved-domain contract examples
+$PY -m predicatelab.cli examples --domain mineral
+$PY -m predicatelab.cli examples --domain image
 ```
+
+Development-data lifecycle smoke (separate database, relaxed gates, not a
+scientific result):
+
+```bash
+$PY -m predicatelab.cli discover --config configs/tabular_dev_v11.yaml --rounds 1
+$PY -m predicatelab.cli freeze-family --config configs/tabular_dev_v11.yaml --run-id run_...
+$PY -m predicatelab.cli confirm --config configs/tabular_dev_v11.yaml --run-id run_...
+$PY -m predicatelab.cli finalize --config configs/tabular_dev_v11.yaml \
+    --run-id run_... --candidate-id cand_...
+$PY -m predicatelab.cli export --config configs/tabular_dev_v11.yaml \
+    --run-id run_... --out artifacts_v11_dev_e2e/run_.../bundle
+```
+
+`discover` writes `artifacts/run_<timestamp>/` with `context.json`,
+`report.json`, `report.md`, `evidence.jsonl` and per-trial logs.
+`freeze-family` adds `frozen_family.json`; `confirm` adds
+`confirmation.json`; `finalize` adds `frozen_manifest.json` and
+`final_evaluation.json`.  `export` adds a bundle with predictions (when the
+adapter emits them), `checksums.sha256` and `bundle_manifest.json`.
+
+**Read `result.state`, not only the exit code.**  `finalize` exits 0 when
+execution completed; the scientific state (`independently_confirmed`,
+`resampling_confirmed`, `insufficient`, `rejected`) is in the payload, and
+undefined statistics are `null` plus `null_paths`, never NaN.
+
+## Documentation
+
+- [V1.1 remediation report](docs/v1.1_remediation_report.md) — what changed,
+  migration record, test evidence, dev end-to-end run, remaining risks and
+  `VERIFIED` / `CODE_ONLY` / `NOT_VERIFIED` / `FAILED` status.
+- [V1.1 evaluation protocol](docs/v1.1_evaluation_protocol.md) — normative
+  holdout, label-isolation, identity, state-machine and statistics rules.
+- [V1.1 compatibility report](docs/v1.1_compatibility_report.md) — CLI, config,
+  database and artifact compatibility, migration and rollback.
+- [Architecture](docs/architecture.md) — core modules, identity, round
+  lifecycle, leakage controls.
+- [TSIL experiment](docs/tsil_experiment.md) — upstream reuse, LUSI math,
+  folds, commands, limitations.
+- [TSIL results](docs/results_tsil.md) — historical run.
+- [Generic tabular results](docs/results_tabular.md).
+- [Extending domains](docs/extending_domains.md) — adapter contract,
+  mineral/image reservations, checklist.
+- [Evidence and limitations](docs/evidence_and_limitations.md).
+
+## Tests
+
+```bash
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. $PY -m pytest -q
+# 105 passed
+```
+
+(`pytest.ini` disables qlib's optional `fugue_test` plugin, which imports
+`fsspec` at configure time and is unrelated to this project.)
+
+## Environment
+
+Developed with Python 3.12, pydantic 2.11, numpy/pandas, scikit-learn 1.5,
+torch (CUDA), qlib 0.9.6 and PyYAML 6.  TSIL data:
+`/home/dmz-ai/zhengzengrong/FinTSB-main/qlib_data/cn_data` (override in the
+config).  A cached TSIL `validate-config` takes about 28 s and ~590 MB because
+the full data store is hashed; the manifest cache is self-validating.  See the
+limitations documents for what was not run.

@@ -21,8 +21,19 @@ from pathlib import Path
 
 
 def _write(path: str, payload: dict) -> None:
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    Path(path).write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+    """Atomic, strict JSON write: no NaN/Inf and no partial file on a crash."""
+    from predicatelab.core.identity import atomic_write_text, sanitise_json, strict_json_dumps
+
+    clean, null_paths = sanitise_json(payload)
+    if null_paths:
+        # Callers must not report a success when a statistic is not a number.
+        if clean.get("status") == "success":
+            clean["status"] = "failed"
+            clean["error"] = (
+                "non-finite result fields rejected: " + ", ".join(null_paths[:20])
+            )
+        clean["null_paths"] = null_paths
+    atomic_write_text(path, strict_json_dumps(clean))
 
 
 def _make_handler_config(job: dict) -> dict:
@@ -166,6 +177,8 @@ def _prediction_metrics(preds) -> tuple[dict, dict]:
 
 def run_trial(job: dict) -> dict:
     t0 = time.time()
+    import numpy as np
+
     from predicatelab.domains.tsil.dsl import compile_descriptor
 
     descriptor = job.get("descriptor") or {}
@@ -209,8 +222,27 @@ def run_trial(job: dict) -> dict:
     )
     preds, fit_metrics = model.fit(dataset)
     metrics, series = _prediction_metrics(preds)
+    primary = "ic"
+    if not np.isfinite(metrics.get(primary, np.nan)):
+        return {
+            "status": "failed",
+            "error": f"primary metric {primary!r} is not finite ({metrics.get(primary)!r}); "
+                     "no valid independent samples",
+            "metrics": metrics, "metric_series": series, "fitted_params": {},
+            "predictions_path": "", "duration_s": time.time() - t0,
+            "worker": {"variant": job["variant"], "fold": fold["fold_id"]},
+        }
+    if not series.get(primary):
+        return {
+            "status": "failed",
+            "error": f"empty {primary!r} series; a success cannot be claimed",
+            "metrics": metrics, "metric_series": series, "fitted_params": {},
+            "predictions_path": "", "duration_s": time.time() - t0,
+            "worker": {"variant": job["variant"], "fold": fold["fold_id"]},
+        }
 
     pred_path = ""
+    pred_index: dict = {}
     if job.get("save_predictions"):
         import numpy as np
         import pandas as pd
@@ -227,6 +259,13 @@ def run_trial(job: dict) -> dict:
             score=np.asarray(preds["score"], dtype=float),
             label=np.asarray(preds["label"], dtype=float),
         )
+        pred_index = {
+            "n_rows": int(len(inst)),
+            "date_min": min(dates) if dates else None,
+            "date_max": max(dates) if dates else None,
+            "has_label": bool("label" in preds),
+        }
+    identity = job.get("identity") or {}
     return {
         "status": "success",
         "metrics": metrics,
@@ -234,14 +273,21 @@ def run_trial(job: dict) -> dict:
         "metric_series": series,
         "fitted_params": {},
         "predictions_path": pred_path,
+        "prediction_index": pred_index,
         "duration_s": time.time() - t0,
         "error": "",
         "worker": {
             "variant": job["variant"],
+            "control_kind": job.get("control_kind", ""),
             "gpu": os.environ.get("CUDA_VISIBLE_DEVICES", ""),
             "fold": fold["fold_id"],
+            "seed": seed,
             "n_epochs": training.get("n_epochs"),
             "max_steps_per_epoch": training.get("max_steps_per_epoch"),
+            "train": [fold["train_start"], fold["train_end"]],
+            "valid": [fold["valid_start"], fold["valid_end"]],
+            "test": [fold.get("test_start"), fold.get("test_end")],
+            "identity": identity,
         },
     }
 
@@ -281,6 +327,9 @@ def main(argv: list[str]) -> int:
     with open(job_path, encoding="utf-8") as fh:
         job = json.load(fh)
     result_path = job["result_path"]
+    # Remove any stale result before doing anything that could fail.
+    if Path(result_path).exists():
+        Path(result_path).unlink()
     # CUDA_VISIBLE_DEVICES must be set before torch is imported
     if job.get("gpu") is not None:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(job["gpu"])
@@ -308,7 +357,7 @@ def main(argv: list[str]) -> int:
         }
     _write(result_path, result)
     print(f"[worker] {result.get('status')} -> {result_path}")
-    return 0
+    return 0 if result.get("status") == "success" else 1
 
 
 if __name__ == "__main__":
