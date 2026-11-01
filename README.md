@@ -85,6 +85,9 @@ undefined statistics are `null` plus `null_paths`, never NaN.
 
 ## Documentation
 
+- [Code guide (中文)](docs/code_guide.md) — end-to-end walkthrough of the
+  codebase: identity, lifecycle, config, artifacts, debugging, and recipes for
+  extending predicates, statistics, domains and the database schema.
 - [V1.1 remediation report](docs/v1.1_remediation_report.md) — what changed,
   migration record, test evidence, dev end-to-end run, remaining risks and
   `VERIFIED` / `CODE_ONLY` / `NOT_VERIFIED` / `FAILED` status.
