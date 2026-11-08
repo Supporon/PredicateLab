@@ -1,0 +1,12 @@
+
+[notice] A new release of pip is available: 23.0.1 -> 26.3
+[notice] To update, run: /home/zhengzengrong/PredicateLab/audit_20261107_credibility/venv/bin/python -m pip install --upgrade pip
+
+[notice] A new release of pip is available: 23.0.1 -> 26.3
+[notice] To update, run: /home/zhengzengrong/PredicateLab/audit_20261107_credibility/venv/bin/python -m pip install --upgrade pip
+exit=0
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/home/zhengzengrong/PredicateLab/audit_20261107_credibility/venv/lib/python3.10/site-packages/qlib/__init__.py", line 9, in <module>
+    from ruamel.yaml import YAML
+ModuleNotFoundError: No module named 'ruamel'

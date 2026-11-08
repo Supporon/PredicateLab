@@ -1,0 +1,104 @@
+[run] run_20261107_031724 domain=synth_ts snapshot=snap_018c354a6284c798 seeds=[2025, 2026, 2027]
+[round 0] proposed 17 templates
+[round 0] screen=17 promoted=4 validated=3 rejected=0 insufficient=1 duplicates=0 invalid=0
+[freeze] family 2cc7a2ab29a18a1d with 1 candidate(s)
+[run] run_20261107_031727 domain=synth_ts snapshot=snap_018c354a6284c798 seeds=[2025, 2026, 2027]
+[round 0] proposed 17 templates
+[round 0] screen=17 promoted=4 validated=3 rejected=0 insufficient=1 duplicates=0 invalid=0
+[freeze] family 754553a7bf55f907 with 1 candidate(s)
+[run] run_20261107_031729 domain=synth_ts snapshot=snap_018c354a6284c798 seeds=[2025, 2026, 2027]
+[round 0] proposed 17 templates
+[round 0] screen=17 promoted=4 validated=3 rejected=0 insufficient=1 duplicates=0 invalid=0
+[freeze] family a2bfd9b9e12ce98b with 1 candidate(s)
+{
+  "R03_R04_run1_dbA": {
+    "run_id": "run_20261107_031724",
+    "frozen": [
+      "cand_f68abe6fdd890bf4"
+    ],
+    "confirmation_states": [
+      "independently_confirmed"
+    ],
+    "final": {
+      "status": "success",
+      "exploratory": false,
+      "state": "independently_confirmed",
+      "purpose": "confirmatory_final"
+    },
+    "holdout_ledger_rows": [
+      {
+        "run_id": "run_20261107_031724",
+        "status": "completed",
+        "purpose": "confirmatory_final",
+        "test_start": "2024-01-01",
+        "test_end": "2025-08-27"
+      }
+    ]
+  },
+  "R04_run2_same_dbA": {
+    "run_id": "run_20261107_031727",
+    "frozen": [
+      "cand_f68abe6fdd890bf4"
+    ],
+    "confirmation_states": [
+      "independently_confirmed"
+    ],
+    "final": {
+      "blocked": "HoldoutConsumed: holdout key 493036af1ba49fea already consumed by run=run_20261107_031724 candidate=cand_f68abe6fdd890bf4 status=completed; a fresh confirmatory evaluation is no"
+    },
+    "holdout_ledger_rows": [
+      {
+        "run_id": "run_20261107_031724",
+        "status": "completed",
+        "purpose": "confirmatory_final",
+        "test_start": "2024-01-01",
+        "test_end": "2025-08-27"
+      }
+    ]
+  },
+  "R03_run3_fresh_dbB": {
+    "run_id": "run_20261107_031729",
+    "frozen": [
+      "cand_f68abe6fdd890bf4"
+    ],
+    "confirmation_states": [
+      "independently_confirmed"
+    ],
+    "final": {
+      "status": "success",
+      "exploratory": false,
+      "state": "independently_confirmed",
+      "purpose": "confirmatory_final"
+    },
+    "holdout_ledger_rows": [
+      {
+        "run_id": "run_20261107_031729",
+        "status": "completed",
+        "purpose": "confirmatory_final",
+        "test_start": "2024-01-01",
+        "test_end": "2025-08-27"
+      }
+    ]
+  },
+  "R03_R04_expected": {
+    "run2_same_db_final": "blocked or exploratory (holdout consumed) -- engine does this",
+    "run2_confirmation": "should be refused or downgraded: f2023 already used by run1 (no ledger)",
+    "run3_fresh_db_final": "should be refused: same dataset/period already consumed in db_A"
+  },
+  "R08": {
+    "git_available_in_tree": false,
+    "fingerprint_before_edit": "097e55e1f999e346d313490bee0e89b7ca1b0f6bc0cbd0084471788ecb615fad",
+    "fingerprint_after_edit": "097e55e1f999e346d313490bee0e89b7ca1b0f6bc0cbd0084471788ecb615fad",
+    "unchanged_after_source_edit": true,
+    "commit": "unknown"
+  },
+  "R09": {
+    "evidence_n_dates": 1428,
+    "per_seed_n_dates": {
+      "2025": 476,
+      "2026": 476,
+      "2027": 476
+    },
+    "n_validation_dates_field": 1428
+  }
+}

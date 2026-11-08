@@ -1,0 +1,106 @@
+{
+  "fold": {
+    "fold_id": "f2020",
+    "kind": "time",
+    "role": "search",
+    "train_start": "2018-01-01",
+    "train_end": "2019-12-25",
+    "valid_start": "2020-01-07",
+    "valid_end": "2020-12-29",
+    "test_start": null,
+    "test_end": null,
+    "purge_days": 2,
+    "embargo_days": 3,
+    "metadata": {},
+    "notes": "effective train_end=2019-12-27, valid_start=2020-01-07; label isolation trimmed train_end 2019-12-27->2019-12-25 (tail labels need prices at/after valid_start); label isolation trimmed valid_end 2020-12-31->2020-12-29 (2 dates need later prices)"
+  },
+  "segments": {
+    "train": [
+      "2018-01-02",
+      "2019-10-16"
+    ],
+    "valid": [
+      "2019-10-21",
+      "2019-12-25"
+    ],
+    "test": [
+      "2020-01-07",
+      "2020-12-29"
+    ]
+  },
+  "split_meta": {
+    "mode": "carved_early_stop_from_train",
+    "early_stop": [
+      "2019-10-21",
+      "2019-12-25"
+    ],
+    "reported": [
+      "2020-01-07",
+      "2020-12-29"
+    ],
+    "purge_days": 2,
+    "early_stop_frac": 0.1,
+    "n_train_days": 483,
+    "n_early_stop_days": 48
+  },
+  "n_rows_learn_frame": 226776,
+  "n_instruments": 422,
+  "train": {
+    "n_samples": 127061,
+    "windows_with_foreign_instrument_rows": 1860,
+    "share_foreign": 0.01464,
+    "foreign_windows_with_future_dated_rows": 1710,
+    "n_target_instruments_affected": 100,
+    "same_instrument_windows_spanning_gap_gt10d": 1019,
+    "eval_emitted": 126400,
+    "eval_dropped": 661,
+    "eval_dropped_instruments": [
+      "SZ300408",
+      "SZ300413",
+      "SZ300433",
+      "SZ300498"
+    ],
+    "eval_n_dropped_instruments": 4,
+    "eval_n_dates_touched_by_drop": 315
+  },
+  "valid": {
+    "n_samples": 14354,
+    "windows_with_foreign_instrument_rows": 0,
+    "share_foreign": 0.0,
+    "foreign_windows_with_future_dated_rows": 0,
+    "n_target_instruments_affected": 0,
+    "same_instrument_windows_spanning_gap_gt10d": 55,
+    "eval_emitted": 13600,
+    "eval_dropped": 754,
+    "eval_dropped_instruments": [
+      "SZ300024",
+      "SZ300033",
+      "SZ300059",
+      "SZ300070",
+      "SZ300072",
+      "SZ300122",
+      "SZ300124",
+      "SZ300136",
+      "SZ300142",
+      "SZ300144",
+      "..."
+    ],
+    "eval_n_dropped_instruments": 16,
+    "eval_n_dates_touched_by_drop": 48
+  },
+  "test": {
+    "n_samples": 71254,
+    "windows_with_foreign_instrument_rows": 590,
+    "share_foreign": 0.00828,
+    "foreign_windows_with_future_dated_rows": 511,
+    "n_target_instruments_affected": 34,
+    "same_instrument_windows_spanning_gap_gt10d": 5844,
+    "eval_emitted": 71200,
+    "eval_dropped": 54,
+    "eval_dropped_instruments": [
+      "SZ300628"
+    ],
+    "eval_n_dropped_instruments": 1,
+    "eval_n_dates_touched_by_drop": 54
+  }
+}

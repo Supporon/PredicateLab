@@ -1,0 +1,2 @@
+fc332c6101584807d402a1bdd72e6964f4b1ced47f4e33da63c97ec173337ac8  ../PredicateLab_CodingAgent_Implementation_Prompt_20261106.md
+bcf88a7a944876216496f8b6da2210395e046facd9bffe3da39367c99b4fc6bb  ../qlib_bin.tar.gz

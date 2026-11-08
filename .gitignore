@@ -1,0 +1,36 @@
+# --- Python caches ---
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+
+# --- Experiment outputs ---
+runs/
+outputs/
+artifacts/
+artifacts_*/
+*.sqlite
+*.db
+checkpoints/
+*.pth
+*.pt
+*.ckpt
+*.log
+
+# --- Data ---
+data/
+qlib_bin/
+*.tar.gz
+*.zip
+*.csv
+*.h5
+*.npy
+*.npz
+*.pkl
+
+# --- Editors / OS ---
+.idea/
+.vscode/
+.DS_Store

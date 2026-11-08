@@ -1,0 +1,22 @@
+ok ruamel.yaml
+ok filelock
+ok loguru
+ok fire
+ok tqdm
+ok joblib
+ok matplotlib
+ok plotly
+FAIL statsmodels
+ok dill
+FAIL pyarrow
+ok redis
+ok python-redis-lock
+ok pymongo
+ok gym
+ok cloudpickle
+FAIL lightgbm
+  File "/home/zhengzengrong/PredicateLab/audit_20261107_credibility/venv/lib/python3.10/site-packages/qlib/contrib/report/analysis_model/analysis_model_performance.py", line 9, in <module>
+    import statsmodels.api as sm
+ModuleNotFoundError: No module named 'statsmodels'
+qlib 0.9.6
+qlib imports ok 0.9.6 2.1.2 2.3.2

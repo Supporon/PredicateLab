@@ -1,0 +1,19 @@
+{
+  "quadratic_loss": {
+    "actual": 1.3828179836273193,
+    "independent_reference": 1.3828179836273193,
+    "absolute_difference": 0.0,
+    "max_abs_autograd_vs_reference_gradient": 2.9802322387695312e-08,
+    "max_abs_finite_difference_vs_reference_gradient": 0.0009511858224868774
+  },
+  "degeneracy": {
+    "constant_dsl_P_max_abs": 0.0,
+    "ones_control_P_diag": 0.1111111119389534,
+    "ones_control_P_offdiag": 0.111111119389534
+  },
+  "row_permutation_equivariance": {
+    "phi_cycle_max_abs_difference": 0.18300653994083405,
+    "phi_volatility_max_abs_difference": 2.9802322387695312e-08,
+    "criterion": "0 (within float tolerance) is required for a predicate based only on sample values, independent of arbitrary batch order"
+  }
+}

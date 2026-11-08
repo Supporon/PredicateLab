@@ -1,0 +1,13 @@
+# Core platform (tabular scenario runs with these alone)
+pydantic>=2.5
+numpy
+pandas
+scikit-learn>=1.3
+PyYAML>=6
+
+# TSIL scenario (install separately; qlib pins its own numpy/pandas ranges)
+# torch
+# pyqlib==0.9.6
+
+# Tests
+pytest

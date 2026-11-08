@@ -1,0 +1,24 @@
+[51262:MainThread](2026-11-07 12:34:38,657) INFO - qlib.Initialization - [config.py:420] - default_conf: client.
+[51262:MainThread](2026-11-07 12:34:39,505) INFO - qlib.Initialization - [__init__.py:74] - qlib successfully initialized based on client settings.
+[51262:MainThread](2026-11-07 12:34:39,505) INFO - qlib.Initialization - [__init__.py:76] - data_path={'__DEFAULT_FREQ': PosixPath('/home/zhengzengrong/PredicateLab/audit_20261107_credibility/tmpdata/qlib_subset')}
+[51262:MainThread](2026-11-07 12:34:47,776) INFO - qlib.timer - [log.py:127] - Time cost: 8.243s | Loading data Done
+[51262:MainThread](2026-11-07 12:34:49,792) INFO - qlib.timer - [log.py:127] - Time cost: 1.682s | RobustZScoreNorm Done
+[51262:MainThread](2026-11-07 12:34:50,065) INFO - qlib.timer - [log.py:127] - Time cost: 0.271s | Fillna Done
+[51262:MainThread](2026-11-07 12:34:50,425) INFO - qlib.timer - [log.py:127] - Time cost: 0.089s | DropnaLabel Done
+/home/zhengzengrong/PredicateLab/audit_20261107_credibility/venv/lib/python3.10/site-packages/qlib/data/dataset/processor.py:363: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df[cols] = t
+[51262:MainThread](2026-11-07 12:34:50,483) INFO - qlib.timer - [log.py:127] - Time cost: 0.057s | CSRankNorm Done
+[51262:MainThread](2026-11-07 12:34:50,501) INFO - qlib.timer - [log.py:127] - Time cost: 2.724s | fit & process data Done
+[51262:MainThread](2026-11-07 12:34:50,501) INFO - qlib.timer - [log.py:127] - Time cost: 10.969s | Init data Done
+/home/zhengzengrong/PredicateLab/audit_20261107_credibility/src_copy/TSIL-main/src/dataset_ori_onehot.py:412: FutureWarning: Series.__getitem__ treating keys as positions is deprecated. In a future version, integer keys will always be treated as labels (consistent with DataFrame behavior). To access a value by position, use `ser.iloc[pos]`
+  label.append(self._label[slc.stop - 1])
+/home/zhengzengrong/PredicateLab/audit_20261107_credibility/src_copy/TSIL-main/src/dataset_ori_onehot.py:412: FutureWarning: Series.__getitem__ treating keys as positions is deprecated. In a future version, integer keys will always be treated as labels (consistent with DataFrame behavior). To access a value by position, use `ser.iloc[pos]`
+  label.append(self._label[slc.stop - 1])
+/home/zhengzengrong/PredicateLab/audit_20261107_credibility/src_copy/TSIL-main/src/dataset_ori_onehot.py:412: FutureWarning: Series.__getitem__ treating keys as positions is deprecated. In a future version, integer keys will always be treated as labels (consistent with DataFrame behavior). To access a value by position, use `ser.iloc[pos]`
+  label.append(self._label[slc.stop - 1])
+/home/zhengzengrong/PredicateLab/audit_20261107_credibility/src_copy/TSIL-main/src/dataset_ori_onehot.py:412: FutureWarning: Series.__getitem__ treating keys as positions is deprecated. In a future version, integer keys will always be treated as labels (consistent with DataFrame behavior). To access a value by position, use `ser.iloc[pos]`
+  label.append(self._label[slc.stop - 1])

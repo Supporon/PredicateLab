@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Predicate_Lab_v1.1 研究者交互式架构与上手手册</title>
+  <style>
+    /* ==========================================================================
+       Tier 0 Foundations — Validated DataViz Palette (Light & Dark)
+       Validated via scripts/validate_palette.js (OKLab CVD ΔE >= 9.2, Normal >= 26.5)
+       ========================================================================== */
+    :root,
+    .viz-root {
+      color-scheme: light;
+      --page-plane:      #f9f9f7;
+      --surface-1:       #fcfcfb;
+      --surface-2:       #f3f2ee;
+      --text-primary:    #0b0b0b;
+      --text-secondary:  #52514e;
+      --text-muted:      #898781;
+      --gridline:        #e1e0d9;
+      --baseline:        #c3c2b7;
+      --border-hairline: rgba(11, 11, 11, 0.10);
+      --code-bg:         #f2f1ec;
+
+      /* Fixed categorical hue order (Slots 1-3 validate all-pairs in both modes) */
+      --series-1:        #2a78d6; /* Discovery (blue) */
+      --series-2:        #eb6834; /* Confirmation (orange) */
+      --series-3:        #1baf7a; /* Final Holdout (aqua) */
+
+      /* Reserved Status Palette (paired with icon + text label) */
+      --status-good:     #0ca30c;
+      --status-warning:  #fab219;
+      --status-serious:  #ec835a;
+      --status-critical: #d03b3b;
+      --delta-up-good:   #006300;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])),
+      :root:where(:not([data-theme="light"])) .viz-root {
+        color-scheme: dark;
+        --page-plane:      #0d0d0d;
+        --surface-1:       #1a1a19;
+        --surface-2:       #242422;
+        --text-primary:    #f0efec;
+        --text-secondary:  #c3c2b7;
+        --text-muted:      #898781;
+        --gridline:        #2c2c2a;
+        --baseline:        #383835;
+        --border-hairline: rgba(255, 255, 255, 0.10);
+        --code-bg:         #141413;
+
+        --series-1:        #3987e5;
+        --series-2:        #d95926;
+        --series-3:        #199e70;
+
+        --status-good:     #0ca30c;
+        --status-warning:  #fab219;
+        --status-serious:  #ec835a;
+        --status-critical: #d03b3b;
+        --delta-up-good:   #0ca30c;
+      }
+    }
+
+    :root[data-theme="dark"],
+    :root[data-theme="dark"] .viz-root {
+      color-scheme: dark;
+      --page-plane:      #0d0d0d;
+      --surface-1:       #1a1a19;
+      --surface-2:       #242422;
+      --text-primary:    #f0efec;
+      --text-secondary:  #c3c2b7;
+      --text-muted:      #898781;
+      --gridline:        #2c2c2a;
+      --baseline:        #383835;
+      --border-hairline: rgba(255, 255, 255, 0.10);
+      --code-bg:         #141413;
+
+      --series-1:        #3987e5;
+      --series-2:        #d95926;
+      --series-3:        #199e70;
+
+      --status-good:     #0ca30c;
+      --status-warning:  #fab219;
+      --status-serious:  #ec835a;
+      --status-critical: #d03b3b;
+      --delta-up-good:   #0ca30c;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--page-plane);
+      color: var(--text-primary);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Top Sticky Navigation */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--surface-1);
+      border-bottom: 1px solid var(--border-hairline);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border-hairline);
+      background: var(--surface-2);
+      color: var(--text-primary);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .nav-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 10px;
+      border-radius: 6px;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .nav-links a:hover {
+      background: var(--surface-2);
+      color: var(--text-primary);
+    }
+
+    .btn {
+      appearance: none;
+      background: var(--surface-2);
+      color: var(--text-primary);
+      border: 1px solid var(--border-hairline);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn:hover {
+      border-color: var(--baseline);
+    }
+
+    .btn.active {
+      background: var(--series-1);
+      color: #ffffff;
+      border-color: transparent;
+    }
+
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 28px 24px 72px;
+    }
+
+    /* Section Headers */
+    .section {
+      margin-top: 40px;
+    }
+
+    .section-header {
+      margin-bottom: 16px;
+    }
+
+    .section-eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .section-title {
+      font-size: 22px;
+      font-weight: 700;
+      margin: 0 0 6px 0;
+    }
+
+    .section-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin: 0;
+      max-width: 860px;
+    }
+
+    /* Cards & Stat Tiles */
+    .card {
+      background: var(--surface-1);
+      border: 1px solid var(--border-hairline);
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .stat-tile {
+      background: var(--surface-1);
+      border: 1px solid var(--border-hairline);
+      border-radius: 10px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .stat-label {
+      font-size: 12.5px;
+      color: var(--text-secondary);
+      font-weight: 500;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+
+    .stat-delta {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--delta-up-good);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* Interactive Pipeline Stepper */
+    .pipeline-rail {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .step-btn {
+      text-align: left;
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: var(--surface-1);
+      border: 1px solid var(--border-hairline);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .step-btn:hover {
+      border-color: var(--baseline);
+    }
+
+    .step-btn.active {
+      background: var(--surface-2);
+      border: 2px solid var(--series-1);
+    }
+
+    .step-num {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 3px;
+    }
+
+    .step-name {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: block;
+    }
+
+    .step-fold {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+      display: block;
+    }
+
+    .step-detail-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 18px;
+    }
+
+    @media (max-width: 860px) {
+      .step-detail-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Scenario Filter Tabs */
+    .scenario-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .scenario-tab {
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border-hairline);
+      background: var(--surface-1);
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .scenario-tab.active {
+      background: var(--series-1);
+      color: #ffffff;
+      border-color: transparent;
+    }
+
+    .badge-domain {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--surface-2);
+      color: var(--text-primary);
+      border: 1px solid var(--border-hairline);
+      margin-right: 6px;
+    }
+
+    /* Code Blocks */
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border-hairline);
+      border-radius: 8px;
+      padding: 14px 16px;
+      overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12.5px;
+      line-height: 1.5;
+      margin: 10px 0 0 0;
+      position: relative;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12.5px;
+      background: var(--code-bg);
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+
+    pre code {
+      background: transparent;
+      padding: 0;
+    }
+
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    /* Data Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--gridline);
+      vertical-align: top;
+    }
+
+    th {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      background: var(--surface-2);
+    }
+
+    .num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Chart Chrome & Legend */
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .legend-row {
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12.5px;
+      color: var(--text-primary);
+      cursor: pointer;
+      user-select: none;
+      padding: 3px 8px;
+      border-radius: 5px;
+      border: 1px solid transparent;
+    }
+
+    .legend-item:hover {
+      background: var(--surface-2);
+    }
+
+    .legend-item.dimmed {
+      opacity: 0.35;
+    }
+
+    .swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    /* Tooltip */
+    .chart-tooltip {
+      position: fixed;
+      pointer-events: none;
+      background: var(--surface-1);
+      color: var(--text-primary);
+      border: 1px solid var(--baseline);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 12.5px;
+      font-variant-numeric: tabular-nums;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+      z-index: 999;
+      display: none;
+      min-width: 210px;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    @media (max-width: 900px) {
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .callout {
+      border-left: 4px solid var(--series-1);
+      background: var(--surface-2);
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      font-size: 13.5px;
+      margin: 12px 0;
+    }
+
+    .callout.warn {
+      border-left-color: var(--status-warning);
+    }
+  </style>
+</head>
+<body class="viz-root" data-palette="#2a78d6,#eb6834,#1baf7a">
+
+  <!-- Sticky Header -->
+  <header class="topbar">
+    <div class="brand">
+      <span>Predicate_Lab_v1.1 研究者交互式手册</span>
+      <span class="status-pill">
+        <span class="status-dot" style="background: var(--status-good);"></span>
+        ✓ 137/137 回归通过 · R01–R09 已修复
+      </span>
+    </div>
+    <nav class="nav-links">
+      <a href="#readiness">1. 校准与就绪度</a>
+      <a href="#pipeline">2. 运行链路交互图</a>
+      <a href="#playbook">3. 改码速查矩阵</a>
+      <a href="#tabular-guide">4. 结构化数据实战</a>
+      <a href="#tsil-guide">5. TSIL 新谓词实战</a>
+      <a href="#probe-catalog">6. 30 算子探针表</a>
+    </nav>
+    <div>
+      <button class="btn" id="themeToggle" type="button" aria-label="切换深浅色主题">
+        ◐ 切换深色/浅色
+      </button>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- =====================================================================
+         SECTION 1: Readiness KPIs & 400-Replicate Calibration Chart
+         ===================================================================== -->
+    <section id="readiness" class="section" style="margin-top: 8px;">
+      <div class="section-header">
+        <div class="section-eyebrow">Section 01 · Scientific Readiness & Calibration</div>
+        <h1 class="section-title">平台就绪度与 400 次全流程统计校准基线</h1>
+        <p class="section-desc">
+          在正式开启结构化数据（<code>tabular</code>）或量化时序（<code>tsil</code>）研究前，平台已通过 400 次/场景全链路蒙特卡洛校准与真实 CSI300 + NVIDIA A100 GPU 端到端验证，期间 <code>f2023</code>（确认集）与 <code>holdout_2024_2025</code>（终审集）保持零消耗。
+        </p>
+      </div>
+
+      <!-- KPI Stat Tiles -->
+      <div class="kpi-grid">
+        <div class="stat-tile">
+          <div class="stat-label">零假设确认/终审假阳性率 (N2 / N3)</div>
+          <div class="stat-value">0.00%</div>
+          <div class="stat-delta">✓ 0 / 400 次误报 (95% CI [0.00%, 0.95%])</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">中等信号端到端检出率 (P2: +0.010 IC)</div>
+          <div class="stat-value">88.75%</div>
+          <div class="stat-delta">✓ 355 / 400 终审检出 · 真族精确率 100%</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">真实 CSI300 跨股票越界切片 (R01)</div>
+          <div class="stat-value">0</div>
+          <div class="stat-delta">✓ 全折按品种边界截断 + 尾批次 100% 保留 (R02)</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">真实 CSI300 探针门控通过算子</div>
+          <div class="stat-value">29 / 30</div>
+          <div class="stat-delta">✓ 22/23 原生 + 7/7 DSL 族通过 5 项数学检验</div>
+        </div>
+      </div>
+
+      <!-- Interactive Grouped Bar Chart + WCAG Table View Twin -->
+      <figure class="card" style="margin-top: 18px; margin-left: 0; margin-right: 0;">
+        <div class="chart-header">
+          <div>
+            <div style="font-size: 16px; font-weight: 700;">400 次全流程模拟校准：各阶段阳性率 (%) 与 95% Wilson 置信区间</div>
+            <div style="font-size: 12.5px; color: var(--text-secondary); margin-top: 2px;">
+              每个场景运行 400 次完整 <code>discover(rounds=2) → freeze-family → confirm → finalize</code>（点击图例可单独高亮某个阶段，悬停查看精确 CI 与真族命中率）
+            </div>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button class="btn active" id="viewChartBtn" type="button">柱状图视图</button>
+            <button class="btn" id="viewTableBtn" type="button">数据表视图 (Table View)</button>
+          </div>
+        </div>
+
+        <div id="calChartWrap">
+          <div class="legend-row" id="calLegend">
+            <span class="legend-item" data-series="0">
+              <span class="swatch" style="background: var(--series-1);"></span>
+              <span>阶段 1：Discovery 阳性率 (exploratory_positive)</span>
+            </span>
+            <span class="legend-item" data-series="1">
+              <span class="swatch" style="background: var(--series-2);"></span>
+              <span>阶段 2：Confirmation 阳性率 (independently_confirmed)</span>
+            </span>
+            <span class="legend-item" data-series="2">
+              <span class="swatch" style="background: var(--series-3);"></span>
+              <span>阶段 3：Final Holdout 阳性率 (final_positive)</span>
+            </span>
+          </div>
+
+          <svg id="calSvg" viewBox="0 0 920 310" width="100%" style="display: block; overflow: visible;" role="img" aria-label="400次全流程校准三个阶段阳性率分组柱状图"></svg>
+        </div>
+
+        <div id="calTableWrap" style="display: none; margin-top: 10px;">
+          <table>
+            <thead>
+              <tr>
+                <th>校准场景</th>
+                <th>信号与噪声设定</th>
+                <th class="num">Discovery 阳性率 (95% CI)</th>
+                <th class="num">Confirmation 阳性率 (95% CI)</th>
+                <th class="num">Final Holdout 阳性率 (95% CI)</th>
+                <th class="num">真族 (volatility) 精确率</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>N2_seed3e-3_postfix</code></td>
+                <td>全局零假设 + 强种子×折相关噪声 (0.003)</td>
+                <td class="num">2.25% (9/400, [1.19%, 4.22%])</td>
+                <td class="num">0.00% (0/400, [0.00%, 0.95%])</td>
+                <td class="num">0.00% (0/400, [0.00%, 0.95%])</td>
+                <td class="num">N/A (零假设)</td>
+              </tr>
+              <tr>
+                <td><code>N3_seed1.5e-3_famyr2e-3_postfix</code></td>
+                <td>全局零假设 + 种子×折 + 算子族×年份噪声</td>
+                <td class="num">1.50% (6/400, [0.69%, 3.23%])</td>
+                <td class="num">0.00% (0/400, [0.00%, 0.95%])</td>
+                <td class="num">0.00% (0/400, [0.00%, 0.95%])</td>
+                <td class="num">N/A (零假设)</td>
+              </tr>
+              <tr>
+                <td><code>P1_vol+4e-3_postfix</code></td>
+                <td>边界弱信号 (+0.004 IC = 2×MME) + N3 噪声</td>
+                <td class="num">27.50% (110/400, [23.35%, 32.07%])</td>
+                <td class="num">5.50% (22/400, [3.66%, 8.19%])</td>
+                <td class="num">0.50% (2/400, [0.14%, 1.80%])</td>
+                <td class="num">98.39% / 100% / 100%</td>
+              </tr>
+              <tr>
+                <td><code>P2_vol+1e-2_postfix</code></td>
+                <td>中等真实信号 (+0.010 IC = 5×MME) + N3 噪声</td>
+                <td class="num">99.25% (397/400, [97.82%, 99.74%])</td>
+                <td class="num">93.75% (375/400, [90.94%, 95.73%])</td>
+                <td class="num">88.75% (355/400, [85.28%, 91.49%])</td>
+                <td class="num">99.73% / 100% / 100%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </figure>
+    </section>
+
+    <!-- =====================================================================
+         SECTION 2: Interactive Execution Pipeline Explorer
+         ===================================================================== -->
+    <section id="pipeline" class="section">
+      <div class="section-header">
+        <div class="section-eyebrow">Section 02 · End-to-End Execution Pipeline</div>
+        <h2 class="section-title">整体代码运行链路交互图（点击任意阶段查看源码入口与防泄漏机制）</h2>
+        <p class="section-desc">
+          <code>Predicate_Lab_v1.1</code> 通过统一的四阶段协议运转。无论底层是结构化表格（<code>tabular</code>）还是量化深度模型（<code>tsil</code>），核心状态机均由 <code>predicatelab/core/engine.py</code> 驱动。
+        </p>
+      </div>
+
+      <div class="pipeline-rail" id="pipelineRail"></div>
+
+      <div class="card step-detail-grid" id="pipelineDetail"></div>
+    </section>
+
+    <!-- =====================================================================
+         SECTION 3: Interactive Playbook — When to Modify Which Code
+         ===================================================================== -->
+    <section id="playbook" class="section">
+      <div class="section-header">
+        <div class="section-eyebrow">Section 03 · Code Modification Playbook</div>
+        <h2 class="section-title">在什么情况下，需要改什么代码？（点击研究场景切换对应代码模板）</h2>
+        <p class="section-desc">
+          把常见研究需求拆解为 7 个标准场景（A1–A3 面向结构化数据研究，B1–B4 面向 TSIL 时序谓词研究）。点击下方按钮可直接查看需要修改的具体文件、行号与可复制代码片段。
+        </p>
+      </div>
+
+      <div class="scenario-tabs" id="scenarioTabs"></div>
+
+      <div class="card" id="scenarioContent"></div>
+    </section>
+
+    <!-- =====================================================================
+         SECTION 4: Step-by-Step Quickstart A (Tabular) & B (TSIL)
+         ===================================================================== -->
+    <section id="tabular-guide" class="section">
+      <div class="section-header">
+        <div class="section-eyebrow">Section 04 & 05 · Step-by-Step Research Workflows</div>
+        <h2 class="section-title">双赛道实战命令手册：(a) 结构化数据检索 vs (b) TSIL 新谓词探索</h2>
+      </div>
+
+      <div class="two-col">
+        <!-- Track A: Tabular -->
+        <div class="card">
+          <div style="font-size: 17px; font-weight: 700; margin-bottom: 6px;">
+            赛道 A：换一个结构化数据集开始谓词检索与分析
+          </div>
+          <p style="font-size: 13.5px; color: var(--text-secondary); margin-top: 0;">
+            完成场景 <strong>A1</strong> 的 30 行代码改动并准备好 <code>configs/tabular_my_study.yaml</code> 后，按顺序执行以下 4 步：
+          </p>
+          <div class="callout">
+            <strong>核心防泄漏保障</strong>：所有谓词参数（如分位数阈值 <code>threshold</code>、中位数与四分位距 <code>sigmoid</code>、标准化均值方差 <code>interaction</code>）均在 <code>fit_transform(desc, X_train, X_other)</code> 中严格仅使用当前折的 <code>X_train</code> 拟合。
+          </div>
+          <div class="code-header"><span>终端执行命令序列（Tabular 域）</span></div>
+          <pre><code>cd /home/zhengzengrong/PredicateLab/Predicate_Lab_v1.1
+export PY=/home/zhengzengrong/miniconda3/envs/predicatelab/bin/python
+
+# 1. 验证数据完整性、缺失值与分层折划分（0 账本消耗）
+$PY -m predicatelab.cli validate-config --config configs/tabular_my_study.yaml
+
+# 2. 启动多轮谓词检索（自动完成 Probe -> Screen -> Full Validation -> 累积 BH FDR）
+$PY -m predicatelab.cli discover --config configs/tabular_my_study.yaml \
+    --rounds 3 --run-id study_tab_01
+
+# 3. 查看检索证据表与生成 Markdown/JSON 报告
+$PY -m predicatelab.cli evidence --config configs/tabular_my_study.yaml --run-id study_tab_01
+$PY -m predicatelab.cli report   --config configs/tabular_my_study.yaml --run-id study_tab_01
+
+# 4. 冻结候选族并在确认折上做独立确认（注意：每个确认折仅可独立确认一次）
+$PY -m predicatelab.cli freeze-family --config configs/tabular_my_study.yaml \
+    --run-id study_tab_01 --top-k 3
+$PY -m predicatelab.cli confirm --config configs/tabular_my_study.yaml \
+    --run-id study_tab_01
+
+# 5. 对通过确认的唯一最优谓词执行 20% 冻结 Holdout 终审（一次性操作！）
+$PY -m predicatelab.cli finalize --config configs/tabular_my_study.yaml \
+    --run-id study_tab_01 --candidate-id cand_xxxxxx</code></pre>
+        </div>
+
+        <!-- Track B: TSIL -->
+        <div class="card" id="tsil-guide">
+          <div style="font-size: 17px; font-weight: 700; margin-bottom: 6px;">
+            赛道 B：在 TSIL 上设计并探索新的时序谓词
+          </div>
+          <p style="font-size: 13.5px; color: var(--text-secondary); margin-top: 0;">
+            TSIL 的统计不变损失为 <code>L = τ̂ · eᵀIe + τ · eᵀPe</code>。每次编写新谓词后，<strong>先跑 5 秒 CPU 探针自检</strong>，通过后再启动 GPU 训练：
+          </p>
+          <div class="callout warn">
+            <strong>机制设计准则 (R05/R06)</strong>：默认训练采用 <code>shuffle: true, batch_size: 800</code>，单个 batch 跨越约 2 年交易日（同日仅约 2 只股票）。<strong>请设计单样本时序特征算子</strong>（在 <code>dsl.py:raw_phi</code> 中提取每个样本自身的 <code>[T, F]</code> 时序特征），避免使用跨样本均值伪造“当日市场指数”。
+          </div>
+          <div class="code-header"><span>Step 1：5 秒 CPU 探针快速自检（免跑 GPU 检验 5 项数学门控）</span></div>
+          <pre><code>PYTHONPATH=/home/zhengzengrong/PredicateLab/Predicate_Lab_v1.1 \
+/home/zhengzengrong/miniconda3/envs/predicatelab/bin/python -c '
+import yaml
+from predicatelab.domains.tsil.adapter import TSILAdapter
+
+cfg = yaml.safe_load(open("/home/zhengzengrong/PredicateLab/Predicate_Lab_v1.1/configs/tsil_lstm_smoke.yaml"))
+cfg["run"]["artifacts_dir"] = "/home/zhengzengrong/PredicateLab/audit_20261107_credibility/tmpdata/tsil_smoke_verify_v2/artifacts"
+adapter = TSILAdapter(cfg)
+snap = adapter.snapshot(cfg)
+f2022 = [f for f in adapter.build_protocol(cfg).folds if f.fold_id == "f2022"][0]
+
+# 替换为你新写的算子描述符：
+desc = {"family": "volatility", "params": {"window": 10}, "feature_slice": [0, 64]}
+res = adapter.probe(desc, f2022, snap, cfg, "/tmp/probe_quickcheck")
+print("PROBE OK:", res["ok"], "| REASON:", res["reason"])
+print("CHECKS:", res.get("checks"))
+'</code></pre>
+          <div class="code-header"><span>Step 2：启动 GPU 探索运行（仅消耗 f2020/f2021/f2022，不动 f2023 与 Holdout）</span></div>
+          <pre><code>cd /home/zhengzengrong/PredicateLab/Predicate_Lab_v1.1
+/home/zhengzengrong/miniconda3/envs/predicatelab/bin/python -m predicatelab.cli discover \
+    --config configs/tsil_lstm_quick.yaml --rounds 2 --run-id tsil_explore_v1</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         SECTION 6: Complete 30-Predicate Real CSI300 Probe Catalog
+         ===================================================================== -->
+    <section id="probe-catalog" class="section">
+      <div class="section-header">
+        <div class="section-eyebrow">Section 06 · Real CSI300 Predicate Probe Catalog</div>
+        <h2 class="section-title">现有 30 个 TSIL 谓词（23 原生 + 7 DSL 族）真实 CSI300 探针实测表</h2>
+        <p class="section-desc">
+          基于真实 CSI300 <code>f2022.npz</code> 探针批次（<code>shape=(64, 20, 158)</code>）实测。可用于规划新谓词设计时参考哪些算子属于单样本特征（<code>per_sample</code>）、哪些属于跨样本池化（<code>pooled_minibatch_cross_sample</code>）。
+        </p>
+      </div>
+
+      <div class="card">
+        <div style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="btn active" data-filter="all" onclick="filterPredicates('all', this)">全部算子 (30)</button>
+          <button class="btn" data-filter="dsl" onclick="filterPredicates('dsl', this)">DSL 参数化算子族 (7)</button>
+          <button class="btn" data-filter="per_sample" onclick="filterPredicates('per_sample', this)">单样本时序算子 per_sample (20)</button>
+          <button class="btn" data-filter="cross_sample" onclick="filterPredicates('cross_sample', this)">跨样本耦合算子 (9)</button>
+          <button class="btn" data-filter="rejected" onclick="filterPredicates('rejected', this)">探针拦截退化算子 (1)</button>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>算子名称 / 族</th>
+              <th>分类</th>
+              <th>批次耦合机制 (batch_coupling)</th>
+              <th class="num">行置换最大误差</th>
+              <th class="num">trace(P)</th>
+              <th>真实 CSI300 Probe 状态</th>
+            </tr>
+          </thead>
+          <tbody id="predicateTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <div class="chart-tooltip" id="tooltip"></div>
+
+  <script>
+    // =========================================================================
+    // 1. Theme Toggle
+    // =========================================================================
+    const rootEl = document.documentElement;
+    document.getElementById("themeToggle").addEventListener("click", () => {
+      const cur = rootEl.getAttribute("data-theme") || "light";
+      rootEl.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+    });
+
+    // =========================================================================
+    // 2. 400-Replicate Calibration Grouped Bar Chart (DataViz Compliant)
+    // =========================================================================
+    const calData = [
+      {
+        id: "N2 (强种子噪声零假设)",
+        subtitle: "Global Null + σ_seed=0.003",
+        rates: [2.25, 0.00, 0.00],
+        counts: ["9/400", "0/400", "0/400"],
+        cis: ["[1.19%, 4.22%]", "[0.00%, 0.95%]", "[0.00%, 0.95%]"],
+        prec: ["—", "—", "—"]
+      },
+      {
+        id: "N3 (种子+族×年噪声零假设)",
+        subtitle: "Global Null + 复合相关噪声",
+        rates: [1.50, 0.00, 0.00],
+        counts: ["6/400", "0/400", "0/400"],
+        cis: ["[0.69%, 3.23%]", "[0.00%, 0.95%]", "[0.00%, 0.95%]"],
+        prec: ["—", "—", "—"]
+      },
+      {
+        id: "P1 (+0.004 IC 弱信号 2×MME)",
+        subtitle: "边界弱信号注入 volatility 族",
+        rates: [27.50, 5.50, 0.50],
+        counts: ["110/400", "22/400", "2/400"],
+        cis: ["[23.35%, 32.07%]", "[3.66%, 8.19%]", "[0.14%, 1.80%]"],
+        prec: ["98.39%", "100%", "100%"]
+      },
+      {
+        id: "P2 (+0.010 IC 中等信号 5×MME)",
+        subtitle: "中等信号注入 volatility 族",
+        rates: [99.25, 93.75, 88.75],
+        counts: ["397/400", "375/400", "355/400"],
+        cis: ["[97.82%, 99.74%]", "[90.94%, 95.73%]", "[85.28%, 91.49%]"],
+        prec: ["99.73%", "100%", "100%"]
+      }
+    ];
+
+    const seriesMeta = [
+      { name: "Discovery 阳性率", colorVar: "var(--series-1)" },
+      { name: "Confirmation 阳性率", colorVar: "var(--series-2)" },
+      { name: "Final Holdout 阳性率", colorVar: "var(--series-3)" }
+    ];
+
+    let isolatedSeries = null;
+    const svg = document.getElementById("calSvg");
+    const tooltip = document.getElementById("tooltip");
+
+    function renderCalChart() {
+      const W = 920, H = 310;
+      const padL = 56, padR = 24, padT = 24, padB = 64;
+      const plotW = W - padL - padR;
+      const plotH = H - padT - padB;
+
+      let html = "";
+      // Horizontal gridlines (0%, 25%, 50%, 75%, 100%)
+      for (const tick of [0, 25, 50, 75, 100]) {
+        const y = padT + plotH * (1 - tick / 100);
+        const isBase = tick === 0;
+        html += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="${isBase ? 'var(--baseline)' : 'var(--gridline)'}" stroke-width="${isBase ? 1.5 : 1}" />`;
+        html += `<text x="${padL - 10}" y="${y + 4}" text-anchor="end" fill="var(--text-muted)" font-size="11.5" style="font-variant-numeric: tabular-nums;">${tick}%</text>`;
+      }
+
+      // Nominal 10% FDR reference line
+      const y10 = padT + plotH * (1 - 10 / 100);
+      html += `<line x1="${padL}" y1="${y10}" x2="${W - padR}" y2="${y10}" stroke="var(--text-muted)" stroke-dasharray="4,4" stroke-width="1" />`;
+      html += `<text x="${W - padR - 4}" y="${y10 - 5}" text-anchor="end" fill="var(--text-muted)" font-size="11">名义 FDR 上限 α = 10%</text>`;
+
+      const groupW = plotW / calData.length;
+      const barW = 34;
+      const gap = 3; // >= 2px surface gap between adjacent bars
+
+      calData.forEach((d, gi) => {
+        const groupCenter = padL + groupW * (gi + 0.5);
+        const totalBarsW = 3 * barW + 2 * gap;
+        const startX = groupCenter - totalBarsW / 2;
+
+        d.rates.forEach((rate, si) => {
+          const isDim = isolatedSeries !== null && isolatedSeries !== si;
+          const op = isDim ? 0.22 : 1.0;
+          const x = startX + si * (barW + gap);
+          const barH = Math.max(rate > 0 ? 4 : 2, (rate / 100) * plotH);
+          const y = padT + plotH - barH;
+
+          // Rounded top 4px, flat bottom anchored to baseline
+          html += `
+            <g class="bar-mark" style="opacity: ${op}; cursor: pointer;"
+               data-gi="${gi}" data-si="${si}">
+              <rect x="${x - 3}" y="${padT}" width="${barW + 6}" height="${plotH}" fill="transparent" />
+              <path d="M ${x},${padT + plotH}
+                       L ${x},${y + 4}
+                       Q ${x},${y} ${x + 4},${y}
+                       L ${x + barW - 4},${y}
+                       Q ${x + barW},${y} ${x + barW},${y + 4}
+                       L ${x + barW},${padT + plotH} Z"
+                    fill="${seriesMeta[si].colorVar}" />
+              <text x="${x + barW / 2}" y="${y - 6}" text-anchor="middle"
+                    fill="var(--text-primary)" font-size="11" font-weight="600"
+                    style="font-variant-numeric: tabular-nums;">${rate.toFixed(rate === 0 ? 0 : 1)}%</text>
+            </g>
+          `;
+        });
+
+        // X-axis category label & subtitle
+        html += `<text x="${groupCenter}" y="${padT + plotH + 22}" text-anchor="middle" fill="var(--text-primary)" font-size="12.5" font-weight="600">${d.id}</text>`;
+        html += `<text x="${groupCenter}" y="${padT + plotH + 40}" text-anchor="middle" fill="var(--text-muted)" font-size="11">${d.subtitle}</text>`;
+      });
+
+      svg.innerHTML = html;
+
+      // Bind hover tooltips
+      svg.querySelectorAll(".bar-mark").forEach((el) => {
+        el.addEventListener("mousemove", (ev) => {
+          const gi = Number(el.getAttribute("data-gi"));
+          const si = Number(el.getAttribute("data-si"));
+          const row = calData[gi];
+          tooltip.style.display = "block";
+          tooltip.style.left = Math.min(window.innerWidth - 260, ev.clientX + 14) + "px";
+          tooltip.style.top = (ev.clientY - 20) + "px";
+          tooltip.innerHTML = `
+            <div style="font-weight: 700; margin-bottom: 4px;">${row.id}</div>
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+              <span class="swatch" style="background:${seriesMeta[si].colorVar}"></span>
+              <span>${seriesMeta[si].name}: <strong>${row.rates[si].toFixed(2)}%</strong> (${row.counts[si]})</span>
+            </div>
+            <div style="color: var(--text-secondary); font-size: 11.5px;">95% Wilson CI: ${row.cis[si]}</div>
+            <div style="color: var(--text-secondary); font-size: 11.5px;">真族 (volatility) 精确率: ${row.prec[si]}</div>
+          `;
+        });
+        el.addEventListener("mouseleave", () => {
+          tooltip.style.display = "none";
+        });
+      });
+    }
+
+    renderCalChart();
+
+    // Legend click-to-isolate
+    document.querySelectorAll("#calLegend .legend-item").forEach((item) => {
+      item.addEventListener("click", () => {
+        const s = Number(item.getAttribute("data-series"));
+        isolatedSeries = isolatedSeries === s ? null : s;
+        document.querySelectorAll("#calLegend .legend-item").forEach((el) => {
+          const idx = Number(el.getAttribute("data-series"));
+          el.classList.toggle("dimmed", isolatedSeries !== null && isolatedSeries !== idx);
+        });
+        renderCalChart();
+      });
+    });
+
+    // Chart / Table toggle
+    document.getElementById("viewChartBtn").addEventListener("click", () => {
+      document.getElementById("calChartWrap").style.display = "block";
+      document.getElementById("calTableWrap").style.display = "none";
+      document.getElementById("viewChartBtn").classList.add("active");
+      document.getElementById("viewTableBtn").classList.remove("active");
+    });
+    document.getElementById("viewTableBtn").addEventListener("click", () => {
+      document.getElementById("calChartWrap").style.display = "none";
+      document.getElementById("calTableWrap").style.display = "block";
+      document.getElementById("viewTableBtn").classList.add("active");
+      document.getElementById("viewChartBtn").classList.remove("active");
+    });
+
+    // =========================================================================
+    // 3. Interactive Execution Pipeline Stepper
+    // =========================================================================
+    const pipelineSteps = [
+      {
+        num: "Stage 0",
+        name: "validate-config",
+        fold: "0 账本消耗 · 静态与数据检查",
+        entry: "predicatelab/cli.py:cmd_validate_config → engine._build_context()",
+        files: [
+          "predicatelab/core/identity.py:code_version() (全量 64 个 .py 源码树 SHA-256)",
+          "predicatelab/core/identity.py:full_content_manifest() (113,130 个数据文件 Merkle Root)",
+          "predicatelab/core/holdout.py:validate_and_isolate() (Purge/Embargo 与前瞻标签隔离检查)"
+        ],
+        flow: "读取 YAML 配置 → 校验特征文件与交易日历 → 计算源码树指纹与数据快照哈希 → 验证训练折末尾与验证折起点之间的 Purge Days ≥ 标签未来天数（2个交易日）。",
+        guard: "纯只读检查（使用临时目录并在退出时自动清理），可无限次运行，绝不触碰任何数据训练或暴露账本。"
+      },
+      {
+        num: "Stage 1A",
+        name: "Generator.propose",
+        fold: "候选生成与跨轮自适应变异",
+        entry: "predicatelab/core/engine.py:_run_round() → generator.propose()",
+        files: [
+          "predicatelab/domains/tsil/seeds.py:seed_templates() (23 原生 + 11 DSL 初始种子)",
+          "predicatelab/domains/tsil/generator.py:RuleGenerator._parents() (R07 修复)",
+          "predicatelab/domains/tabular/generator.py:TabularRuleGenerator.propose()"
+        ],
+        flow: "第 0 轮从种子池或 JSON 提案文件加载候选模板；第 r > 0 轮读取上一轮 feedback，按初筛效应 (screen_effect) 排序挑选 Top-K 父代，自动执行窗口扰动 (w±5)、特征切片 ([0, half]) 与投影混合 (P-mix)。",
+        guard: "【R07 防自适应过拟合】：跨轮变异的父代排序严格只看 screen_folds 上的 screen_effect，绝不读取 validation_folds 上的验证效应，防止多轮搜索对验证集产生选择性偏差。"
+      },
+      {
+        num: "Stage 1B",
+        name: "CPU Probe (5 Gates)",
+        fold: "f2022 探针批次 · 5 秒数学门控",
+        entry: "predicatelab/core/engine.py:_probe() → adapter.probe()",
+        files: [
+          "predicatelab/domains/tsil/adapter.py:TSILAdapter.probe() (5 项硬性门控)",
+          "predicatelab/domains/tsil/dsl.py:compile_descriptor() & probe_signature()",
+          "predicatelab/domains/tabular/adapter.py:TabularAdapter.probe()"
+        ],
+        flow: "在 CPU 上加载真实训练折探针批次 (f2022.npz, shape=[64,20,158])，编译并运行算子得到 (I, P)，依次检验：① 有限性 finite ② 对称性 symmetric ③ 非退化性 offdiagonal_range ≥ 1e-6 ④ 半正定谱界 0 ≤ λ(P) ≤ 1 ⑤ 批次行置换等变性 (R05)。",
+        guard: "提取 P 矩阵严格上三角展平向量作为行为签名 (probe_signature)，若新候选与已有候选余弦相似度 ≥ 0.999999，自动标记为 duplicate_behavior 跳过 GPU 训练。"
+      },
+      {
+        num: "Stage 1C",
+        name: "Screen + Validation",
+        fold: "f2022 初筛 → f2020/f2021 多种子验证",
+        entry: "predicatelab/core/engine.py:_evaluate_round() & _recompute_run_discovery_fdr()",
+        files: [
+          "predicatelab/domains/tsil/worker.py:run_trial() (独立 GPU 子进程)",
+          "TSIL-main/src/dataset_ori_onehot.py:_create_ts_slices() (R01/R02 修复)",
+          "predicatelab/core/stats.py:paired_evaluation() & benjamini_hochberg()"
+        ],
+        flow: "先在 screen_folds (f2022, 单种子, 10 epochs) 上初筛，保留 Top-K 进入 validation_folds (f2020+f2021, 3 种子 × 50 epochs)。成对比较候选与 baseline:mse 的逐日截面 IC 序列 Δ_t，计算 Newey-West HAC p 值与 Block Bootstrap CI，并要求同时击败 control:ones。",
+        guard: "【R07 + R09 统计保障】：BH FDR 跨当前 run 所有轮次已进入完整验证的全部候选累积校正；n_dates 报告真实唯一交易日数（如 476 天），不因多随机种子而虚增样本量。"
+      },
+      {
+        num: "Stage 2",
+        name: "Freeze & Confirm",
+        fold: "f2023 独立时间前推确认折",
+        entry: "predicatelab/core/engine.py:freeze_family() → confirm()",
+        files: [
+          "predicatelab/core/engine.py:confirm() (确认集评估与家族内 BH)",
+          "predicatelab/core/store.py:claim_confirmation_window() (R04 确认账本)"
+        ],
+        flow: "先通过 freeze-family 锁定候选族 manifest_hash；随后 confirm() 在从未参与搜索的确认折 (f2023) 上运行全种子配对试验，进行冻结家族内 BH 校正。通过全部门槛者晋升为 independently_confirmed。",
+        guard: "【R04 跨库确认暴露账本】：首次运行 confirm() 会在本地与全局账本 (.predicatelab_global_ledger.sqlite) 登记该数据集确认折已暴露。若二次重跑或换 --db 重跑，结果自动降级为 exploratory_positive。"
+      },
+      {
+        num: "Stage 3",
+        name: "Finalize (Holdout)",
+        fold: "holdout_2024_2025 一次性终审",
+        entry: "predicatelab/core/engine.py:finalize() → _execute_final()",
+        files: [
+          "predicatelab/core/holdout.py:assert_holdout_available()",
+          "predicatelab/core/store.py:claim_holdout() & _sync_global_ledgers() (R03)"
+        ],
+        flow: "仅允许状态为 independently_confirmed 的唯一候选调用。在 2018–2022 训练、2023 早停选择、2024–2025 留出测试集上进行最终盲测，生成不可篡改的 final_evals 终审报告。",
+        guard: "【R03 全局一次性 Holdout 硬锁】：以 (dataset_id, data_manifest_hash, test_start, test_end) 为主键写入全局账本。一旦消耗，任何后续调用（即使换用新 SQLite 文件）均直接抛出 HoldoutConsumed 异常阻断。"
+      }
+    ];
+
+    const railEl = document.getElementById("pipelineRail");
+    const detailEl = document.getElementById("pipelineDetail");
+
+    function selectStep(idx) {
+      railEl.querySelectorAll(".step-btn").forEach((b, i) => {
+        b.classList.toggle("active", i === idx);
+      });
+      const s = pipelineSteps[idx];
+      detailEl.innerHTML = `
+        <div>
+          <div style="font-size: 12px; font-weight: 700; color: var(--series-1); text-transform: uppercase;">
+            ${s.num} · ${s.fold}
+          </div>
+          <h3 style="margin: 4px 0 10px 0; font-size: 18px;">${s.name}</h3>
+          <p style="font-size: 13.5px; color: var(--text-primary); margin: 0 0 12px 0;">
+            <strong>执行链路：</strong>${s.flow}
+          </p>
+          <div class="callout" style="margin-bottom: 0;">
+            <strong>防泄漏与科学可信度保障：</strong>${s.guard}
+          </div>
+        </div>
+        <div style="background: var(--surface-2); padding: 14px 16px; border-radius: 8px; border: 1px solid var(--border-hairline);">
+          <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px;">
+            核心入口函数
+          </div>
+          <code style="display: block; padding: 6px 8px; margin-bottom: 12px;">${s.entry}</code>
+          <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px;">
+            涉及源码文件与关键行
+          </div>
+          <ul style="margin: 0; padding-left: 18px; font-size: 12.5px; color: var(--text-primary);">
+            ${s.files.map(f => `<li style="margin-bottom: 5px;"><code>${f}</code></li>`).join("")}
+          </ul>
+        </div>
+      `;
+    }
+
+    pipelineSteps.forEach((s, idx) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "step-btn" + (idx === 0 ? " active" : "");
+      btn.innerHTML = `
+        <span class="step-num">${s.num}</span>
+        <span class="step-name">${s.name}</span>
+        <span class="step-fold">${s.fold}</span>
+      `;
+      btn.addEventListener("click", () => selectStep(idx));
+      railEl.appendChild(btn);
+    });
+    selectStep(0);
+
+    // =========================================================================
+    // 4. Interactive Scenario-to-Code Modification Playbook
+    // =========================================================================
+    const scenarios = [
+      {
+        id: "A1",
+        domain: "Tabular",
+        title: "A1. 换自己的 CSV / Parquet 结构化数据集",
+        needCodeChange: "需要修改 Python 代码（2 个文件，约 30 行）",
+        files: [
+          "predicatelab/domains/tabular/adapter.py (第 122–143 行 __init__ 及第 195/228/264/378 行 dataset_id)",
+          "predicatelab/domains/tabular/generator.py (第 36 行 seed_pairs 动态过滤特征数)"
+        ],
+        summary: "默认 TabularAdapter 硬编码了 sklearn 乳腺癌数据集（30 列特征）。替换为 CSV/Parquet 读取分支，并将 dataset_id 设为配置文件中的唯一名称，即可无缝复用全套交叉验证、Bootstrap 与 Holdout 账本。",
+        codeTitle: "修改 predicatelab/domains/tabular/adapter.py (__init__) 与 generator.py",
+        code: `# 1. predicatelab/domains/tabular/adapter.py (第 122 行):
+def __init__(self, config: dict[str, Any]):
+    self.config = config
+    self.data_cfg = config.get("data", {})
+    data_path = self.data_cfg.get("path")
+    if data_path:
+        import pandas as pd
+        p = Path(data_path)
+        df = pd.read_parquet(p) if p.suffix.lower() in {".parquet", ".pq"} else pd.read_csv(p)
+        target_col = self.data_cfg["target_col"]
+        drop_cols = set(self.data_cfg.get("drop_cols", [])) | {target_col}
+        feature_cols = [c for c in df.columns if c not in drop_cols]
+        self.X = df[feature_cols].to_numpy(dtype=float)
+        self.y = df[target_col].to_numpy()
+        self.feature_names = [str(c) for c in feature_cols]
+        self.dataset_id = str(self.data_cfg.get("dataset_id", f"tabular-{p.stem}"))
+    else:
+        from sklearn.datasets import load_breast_cancer
+        self.X, self.y = load_breast_cancer(return_X_y=True)
+        self.feature_names = list(load_breast_cancer().feature_names)
+        self.dataset_id = "sklearn-breast-cancer"
+    self.n_features = int(self.X.shape[1])
+    # (同时将同文件第 195, 228, 264, 378 行的 "sklearn-breast-cancer" 替换为 self.dataset_id)
+
+# 2. predicatelab/domains/tabular/generator.py (第 36 行):
+raw_pairs = [(0, 1), (0, 2), (1, 2), (2, 3), (3, 4), (0, 13), (6, 7), (20, 21)]
+self.seed_pairs = [(a, b) for a, b in raw_pairs if a < n_features and b < n_features] or [(0, 1)]`
+      },
+      {
+        id: "A2",
+        domain: "Tabular",
+        title: "A2. 在结构化数据中新增自定义谓词算子",
+        needCodeChange: "需要修改 Python 代码（2 个文件，约 25 行）",
+        files: [
+          "predicatelab/domains/tabular/adapter.py (第 33 行 OPS, 第 67 行 fit_transform, 第 277 行 validate_descriptor)",
+          "predicatelab/domains/tabular/generator.py (第 20 行 KIND 及种子/变异规则)"
+        ],
+        summary: "所有结构化谓词通过 fit_transform(desc, X_train, X_other) 执行。铁律：任何统计量（均值、标准差、分位数）必须只从 X_train 计算，再应用到 X_other，严禁使用全量或验证折统计量。",
+        codeTitle: "示例：新增双特征软门控算子 gated_product",
+        code: `# 1. predicatelab/domains/tabular/adapter.py:
+OPS = {"ratio", "product", "difference", "sigmoid", "threshold", "interaction", "gated_product"}
+
+# 在 fit_transform() 中新增分支:
+elif op == "gated_product":
+    b = int(desc["b"])
+    params["b"] = b
+    mb, sb = float(X_train[:, b].mean()), float(X_train[:, b].std() + 1e-8)
+    params.update({"mean_b": mb, "std_b": sb})
+    gate_tr = 1.0 / (1.0 + np.exp(-(X_train[:, b] - mb) / sb))
+    gate_ot = 1.0 / (1.0 + np.exp(-(X_other[:, b] - mb) / sb))
+    train = X_train[:, a] * gate_tr
+    other = X_other[:, a] * gate_ot
+
+# 在 TabularAdapter.validate_descriptor() 字典中加入:
+"gated_product": {"soft"},
+
+# 2. predicatelab/domains/tabular/generator.py:
+KIND["gated_product"] = CandidateKind.SOFT`
+      },
+      {
+        id: "A3",
+        domain: "Tabular",
+        title: "A3. 更换结构化数据的基线模型 (如换 LightGBM / MLP)",
+        needCodeChange: "需要修改 Python 代码（1 个函数，约 20 行）",
+        files: [
+          "predicatelab/domains/tabular/adapter.py (第 315–345 行 TabularAdapter._predict)"
+        ],
+        summary: "平台通过成对比较「基线模型 (desc=None)」与「基线模型 + 候选谓词列 (desc!=None)」在同一折、同一随机种子下的预测差异来评估谓词贡献。只需替换 _predict 中的 model 定义即可。",
+        codeTitle: "修改 predicatelab/domains/tabular/adapter.py:_predict()",
+        code: `def _predict(self, desc: dict[str, Any] | None, train_idx: np.ndarray, valid_idx: np.ndarray, seed: int):
+    from sklearn.ensemble import HistGradientBoostingClassifier
+    from sklearn.metrics import accuracy_score, log_loss, roc_auc_score
+
+    Xtr, ytr = self.X[train_idx], self.y[train_idx]
+    Xva, yva = self.X[valid_idx], self.y[valid_idx]
+    fitted: dict[str, Any] = {}
+    if desc is not None:
+        col_tr, col_va, fitted = fit_transform(desc, Xtr, Xva)
+        Xtr = np.hstack([Xtr, col_tr])
+        Xva = np.hstack([Xva, col_va])
+    model = HistGradientBoostingClassifier(max_iter=200, random_state=seed)
+    model.fit(Xtr, ytr)
+    prob = model.predict_proba(Xva)[:, 1]
+    ...`
+      },
+      {
+        id: "B1",
+        domain: "TSIL",
+        title: "B1. 零代码修改：用 JSON 提案探索 TSIL 特征切片与组合",
+        needCodeChange: "无需修改任何 Python 代码（0 行代码，仅写 JSON + 改 YAML）",
+        files: [
+          "新建 proposals.json 提案文件",
+          "configs/tsil_*.yaml (设置 search.generator: llm_json)"
+        ],
+        summary: "支持在 Alpha158 的任意特征子区间 (feature_slice: [start, end]) 上运行现有 7 大 DSL 族，或将任意原生谓词与 DSL 谓词通过 combine: 'mix' (投影矩阵加权混合) 或 'concat' (特征拼接) 自由组合。",
+        codeTitle: "proposals.json 与 YAML 配置示例",
+        code: `// 1. 新建 configs/my_proposals.json:
+{
+  "proposals": [
+    {
+      "round": 0,
+      "kind": "statistical",
+      "name": "Tail risk on volume slice [100:158] w=15",
+      "rationale": "在成交量相关因子子空间上度量尾部偏度与峰度",
+      "descriptor": {
+        "family": "tail",
+        "params": {"window": 15},
+        "feature_slice": [100, 158]
+      }
+    },
+    {
+      "round": 0,
+      "kind": "composite",
+      "name": "P-mix(native volatility, DSL drawdown w=20)",
+      "rationale": "混合多尺度波动率与20日最大回撤投影矩阵",
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {"family": "native", "predicate": "phi_volatility", "params": {"window_sizes": [5, 10, 20]}},
+          {"family": "drawdown", "params": {"window": 20}}
+        ],
+        "weights": [1.5, 1.0]
+      }
+    }
+  ]
+}
+
+# 2. 在 YAML 配置中启用:
+search:
+  generator: llm_json
+  generator_config:
+    proposals_path: /home/zhengzengrong/PredicateLab/Predicate_Lab_v1.1/configs/my_proposals.json`
+      },
+      {
+        id: "B2",
+        domain: "TSIL",
+        title: "B2. 【最推荐】在 dsl.py 中新增参数化 TSIL 时序算子族",
+        needCodeChange: "需要修改 Python 代码（3 个文件，约 20 行）",
+        files: [
+          "predicatelab/domains/tsil/dsl.py (第 58 行 OP_PARAMS 与第 225 行 raw_phi)",
+          "predicatelab/domains/tsil/seeds.py (第 47 行 DSL_SEEDS)",
+          "predicatelab/domains/tsil/generator.py (第 136 行与第 209 行算子列表)"
+        ],
+        summary: "只需在 raw_phi() 中编写从单样本时序窗口 [B, k, F] 到特征向量 [B, d] 的 PyTorch 计算，底层 _dsl_I_P 会自动完成标准化、L2 归一化与 P = φ̃φ̃ᵀ 构造，100% 自动满足对称性、半正定性 (λ_max ≤ 1)、单位迹与行置换等变性！",
+        codeTitle: "示例：在 predicatelab/domains/tsil/dsl.py 中新增上下行非对称性算子族 asymmetry",
+        code: `# 1. predicatelab/domains/tsil/dsl.py:
+OP_PARAMS = {
+    "momentum": {"window": "int"},
+    "volatility": {"window": "int"},
+    "dispersion": {"window": "int"},
+    "autocorr": {"window": "int"},
+    "drawdown": {"window": "int"},
+    "tail": {"window": "int"},
+    "trend": {"window": "int"},
+    "asymmetry": {"window": "int"},  # <-- 新增算子族
+}
+
+# 2. 在 raw_phi(descriptor, batch_x) 中添加分支 (m 已经是 [B, k] 的时间序列):
+if family == "asymmetry":
+    centered = m - m.mean(dim=1, keepdim=True)
+    pos = torch.clamp(centered, min=0.0)
+    neg = torch.clamp(-centered, min=0.0)
+    up_rms = (pos.pow(2).mean(dim=1) + 1e-8).sqrt()
+    down_rms = (neg.pow(2).mean(dim=1) + 1e-8).sqrt()
+    log_ratio = torch.log(up_rms / down_rms)
+    up_freq = (centered > 0).float().mean(dim=1)
+    return torch.stack([up_rms - down_rms, log_ratio, up_freq], dim=1)  # shape [B, 3]
+
+# 3. 在 seeds.py 的 DSL_SEEDS 和 generator.py 第 136、209 行的列表中加入 "asymmetry"`
+      },
+      {
+        id: "B3",
+        domain: "TSIL",
+        title: "B3. 在 TSIL-main 中直接编写自定义 (I, P) 核矩阵算子",
+        needCodeChange: "需要修改 Python 代码（2 个文件，约 35 行）",
+        files: [
+          "TSIL-main/src/custom_phi_constructors.py (实现 get_xxx_I_P 并在 get_custom_I_P 注册)",
+          "predicatelab/domains/tsil/dsl.py (第 31 行 NATIVE_PREDICATES 白名单)"
+        ],
+        summary: "适用于非内积形式的核矩阵（如高斯 RBF 核、Laplacian 核）。注意：自定义 P 矩阵必须显式除以 trace(P) 进行迹归一化，以确保通过 TSILAdapter.probe() 的半正定与谱半径门控 (0 ≤ λ(P) ≤ 1)。",
+        codeTitle: "示例：新增高斯 RBF 波动率核谓词 phi_rbf_vol",
+        code: `# 1. TSIL-main/src/custom_phi_constructors.py:
+def get_rbf_vol_I_P(batch_x: torch.Tensor,
+                    device: Optional[torch.device] = None,
+                    **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
+    batch_size = batch_x.shape[0]
+    if device is None:
+        device = batch_x.device
+    I = torch.eye(batch_size, device=device)
+    x = torch.nan_to_num(batch_x.float(), nan=0.0, posinf=0.0, neginf=0.0)
+    feat = x.std(dim=1)  # [B, F]
+    feat = (feat - feat.mean(dim=0, keepdim=True)) / (feat.std(dim=0, keepdim=True) + 1e-6)
+    dist_sq = torch.cdist(feat, feat, p=2.0).pow(2)
+    median_sq = torch.median(dist_sq).clamp_min(1e-6)
+    K = torch.exp(-dist_sq / (2.0 * median_sq))
+    P = K / (torch.diagonal(K).sum() + 1e-8)  # 迹归一化：保证 trace(P)=1 且 λ_max(P)<=1
+    return I, P
+
+# 在 custom_phi_constructors.py 底部 constructors 字典加入:
+"phi_rbf_vol": get_rbf_vol_I_P,
+
+# 2. predicatelab/domains/tsil/dsl.py 的 NATIVE_PREDICATES 中加入:
+"phi_rbf_vol": {"params": {}},`
+      },
+      {
+        id: "B4",
+        domain: "TSIL",
+        title: "B4. 切换股票池 (CSI500)、改预测标签或换骨干网络 (GRU/Transformer)",
+        needCodeChange: "无需修改 Python 代码（仅改 YAML 配置文件）",
+        files: [
+          "configs/tsil_lstm_full.yaml (或新建自定义 YAML)"
+        ],
+        summary: "股票池、预测公式、序列长度、模型骨干（LSTM / GRU / Transformer）以及损失权重混合模式（fixed_tau）均已参数化。注意：若将预测跨度改为 N 天（如 Ref($close, -6)/Ref($close, -1)-1），必须同步将 protocol.purge_days 调大至 ≥ N+1。",
+        codeTitle: "YAML 关键参数配置说明",
+        code: `data:
+  provider_uri: /home/zhengzengrong/.qlib/qlib_data/cn_data
+  tsil_root: /home/zhengzengrong/PredicateLab/Predicate_Lab_v1.1/TSIL-main
+  market: csi300                                # 可选: csi300 / csi500 (需在 instruments/ 下存在对应文件)
+  seq_len: 20                                   # 时序回看窗口长度 T
+  label: Ref($close, -2) / Ref($close, -1) - 1  # 预测目标公式
+  label_future_offset: 2                        # 标签跨越的未来交易日数
+
+model:
+  tau_mode: fixed                               # 固定权重混合，防止可学习 alpha 坍缩 (D-12)
+  fixed_tau: 0.5                                # P 矩阵正则项权重 τ
+
+training:
+  model_type: LSTM                              # 可选: LSTM / GRU / Transformer
+  batch_size: 800
+  gpu: '0'`
+      }
+    ];
+
+    const tabsEl = document.getElementById("scenarioTabs");
+    const contentEl = document.getElementById("scenarioContent");
+
+    function selectScenario(idx) {
+      tabsEl.querySelectorAll(".scenario-tab").forEach((t, i) => {
+        t.classList.toggle("active", i === idx);
+      });
+      const sc = scenarios[idx];
+      contentEl.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+          <div>
+            <span class="badge-domain">${sc.domain} 域</span>
+            <strong style="font-size: 17px;">${sc.title}</strong>
+          </div>
+          <span class="status-pill">${sc.needCodeChange}</span>
+        </div>
+        <p style="font-size: 13.5px; color: var(--text-secondary); margin: 0 0 12px 0;">
+          ${sc.summary}
+        </p>
+        <div style="font-size: 12.5px; margin-bottom: 10px;">
+          <strong>涉及文件：</strong>
+          ${sc.files.map(f => `<code style="margin-right: 6px;">${f}</code>`).join("")}
+        </div>
+        <div class="code-header">
+          <span>${sc.codeTitle}</span>
+        </div>
+        <pre><code>${sc.code.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre>
+      `;
+    }
+
+    scenarios.forEach((sc, idx) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "scenario-tab" + (idx === 0 ? " active" : "");
+      b.textContent = sc.title;
+      b.addEventListener("click", () => selectScenario(idx));
+      tabsEl.appendChild(b);
+    });
+    selectScenario(0);
+
+    // =========================================================================
+    // 5. Real CSI300 30-Predicate Probe Catalog Table
+    // =========================================================================
+    const predicates = [
+      // 7 DSL Families
+      { name: "momentum (DSL)", kind: "dsl", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "均值差分 + 序列最小二乘斜率" },
+      { name: "volatility (DSL)", kind: "dsl", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "各特征时序标准差的均值/最大值/离散度" },
+      { name: "dispersion (DSL)", kind: "dsl", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "截面特征间标准差序列的均值/波动/末值" },
+      { name: "autocorr (DSL)", kind: "dsl", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "1 阶与 2 阶样本内时序自相关系数" },
+      { name: "drawdown (DSL)", kind: "dsl", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "样本内最大回撤与期末回撤" },
+      { name: "tail (DSL)", kind: "dsl", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "90/10 分位比、样本内偏度与超额峰度" },
+      { name: "trend (DSL)", kind: "dsl", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "线性趋势斜率与拟合优度 R²" },
+      // 6 Paper Native Predicates
+      { name: "phi_timestamp", kind: "native", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "论文6谓词：日历 One-Hot 嵌入" },
+      { name: "phi_cycle", kind: "native", coupling: "pooled_minibatch_cross_sample", diff: "0.0", trace: "1.0000", ok: true, note: "论文6谓词：序列轴 FFT 批次主导周期 (R05 已修复)" },
+      { name: "phi_phase", kind: "native", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: false, note: "论文6谓词：T=20 下 ceil(i/T)=1 恒为常数，被 Probe 正确拦截" },
+      { name: "phi_momentum", kind: "native", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "论文6谓词：多窗口相对收益率动量" },
+      { name: "phi_volatility", kind: "native", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "论文6谓词：多窗口滚动波动率" },
+      { name: "phi_return_dist", kind: "native", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "论文6谓词：[均值, 标准差, 偏度, 峰度]" },
+      // 17 Exploratory Native Predicates
+      { name: "phi_trend", kind: "native", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "探索原生：ADX 风格趋势强度" },
+      { name: "phi_multiscale", kind: "native", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "探索原生：多尺度均值与波动特征" },
+      { name: "phi_temporal", kind: "native", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "探索原生：自相关与时间模式" },
+      { name: "phi_feature_corr", kind: "native", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "探索原生：样本内特征间相关性" },
+      { name: "phi_price_volume", kind: "native", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "探索原生：量价协同结构" },
+      { name: "phi_factor", kind: "native", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "探索原生：因子暴露特征" },
+      { name: "phi_technical", kind: "native", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "探索原生：RSI / MACD / 布林带复合指标" },
+      { name: "phi_vol_return", kind: "native", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "探索原生：波动率-收益率联合分布" },
+      { name: "phi_tail_risk", kind: "native", coupling: "per_sample", diff: "0.0", trace: "1.0000", ok: true, note: "探索原生：VaR / CVaR 下行尾部风险" },
+      { name: "phi_return_sim", kind: "native", coupling: "pooled_minibatch_cross_sample", diff: "2.98e-8", trace: "1.0000", ok: true, note: "跨样本耦合：批次内收益率余弦相似度" },
+      { name: "phi_market_beta", kind: "native", coupling: "pooled_minibatch_cross_sample", diff: "2.98e-8", trace: "1.0000", ok: true, note: "跨样本耦合：相对批次均值的伪 Beta (R06 已标注)" },
+      { name: "phi_cross_corr", kind: "native", coupling: "pooled_minibatch_cross_sample", diff: "1.49e-8", trace: "1.0000", ok: true, note: "跨样本耦合：相对批次均值的跨样本相关" },
+      { name: "phi_lead_lag", kind: "native", coupling: "pooled_minibatch_cross_sample", diff: "1.49e-8", trace: "1.0000", ok: true, note: "跨样本耦合：相对批次均值的领先滞后" },
+      { name: "phi_common_factor", kind: "native", coupling: "pooled_minibatch_cross_sample", diff: "2.98e-8", trace: "1.0000", ok: true, note: "跨样本耦合：批次 PCA 第一主成分载荷" },
+      { name: "phi_vol_sync", kind: "native", coupling: "pooled_minibatch_cross_sample", diff: "1.49e-8", trace: "1.0000", ok: true, note: "跨样本耦合：相对批次平均波动率的同步性" },
+      { name: "phi_market_regime", kind: "native", coupling: "pooled_minibatch_cross_sample", diff: "1.49e-8", trace: "1.0000", ok: true, note: "跨样本耦合：相对批次均值的状态敏感度" },
+      { name: "phi_sector_cluster", kind: "native", coupling: "pooled_minibatch_cross_sample", diff: "2.98e-8", trace: "1.0000", ok: true, note: "跨样本耦合：批次内特征距离聚类" }
+    ];
+
+    function renderPredicateTable(filter) {
+      const tbody = document.getElementById("predicateTableBody");
+      const rows = predicates.filter((p) => {
+        if (filter === "all") return true;
+        if (filter === "dsl") return p.kind === "dsl";
+        if (filter === "per_sample") return p.coupling === "per_sample" && p.ok;
+        if (filter === "cross_sample") return p.coupling === "pooled_minibatch_cross_sample";
+        if (filter === "rejected") return !p.ok;
+        return true;
+      });
+      tbody.innerHTML = rows.map((p) => `
+        <tr>
+          <td><code>${p.name}</code><div style="font-size:11.5px; color:var(--text-secondary); margin-top:2px;">${p.note}</div></td>
+          <td>${p.kind === "dsl" ? "DSL 参数化族" : "TSIL 原生谓词"}</td>
+          <td>
+            <span class="status-pill" style="font-size:11.5px;">
+              <span class="status-dot" style="background:${p.coupling === 'per_sample' ? 'var(--status-good)' : 'var(--status-warning)'}"></span>
+              ${p.coupling === "per_sample" ? "per_sample (推荐)" : "pooled_minibatch_cross_sample"}
+            </span>
+          </td>
+          <td class="num">${p.diff}</td>
+          <td class="num">${p.trace}</td>
+          <td>
+            <span class="status-pill" style="font-size:11.5px;">
+              <span class="status-dot" style="background:${p.ok ? 'var(--status-good)' : 'var(--status-critical)'}"></span>
+              ${p.ok ? "✓ PASS (通过 5 项门控)" : "✕ REJECTED (退化常数阵)"}
+            </span>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    window.filterPredicates = function(filter, btnEl) {
+      btnEl.parentElement.querySelectorAll(".btn").forEach((b) => b.classList.remove("active"));
+      btnEl.classList.add("active");
+      renderPredicateTable(filter);
+    };
+
+    renderPredicateTable("all");
+  </script>
+</body>
+</html>

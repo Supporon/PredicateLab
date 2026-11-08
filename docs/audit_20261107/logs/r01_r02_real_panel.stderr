@@ -1,0 +1,18 @@
+[28616:MainThread](2026-11-07 11:05:25,040) INFO - qlib.Initialization - [config.py:420] - default_conf: client.
+[28616:MainThread](2026-11-07 11:05:25,772) INFO - qlib.Initialization - [__init__.py:74] - qlib successfully initialized based on client settings.
+[28616:MainThread](2026-11-07 11:05:25,773) INFO - qlib.Initialization - [__init__.py:76] - data_path={'__DEFAULT_FREQ': PosixPath('/home/zhengzengrong/PredicateLab/audit_20261107_credibility/tmpdata/qlib_subset')}
+[28616:MainThread](2026-11-07 11:05:34,084) INFO - qlib.timer - [log.py:127] - Time cost: 8.284s | Loading data Done
+[28616:MainThread](2026-11-07 11:05:36,272) INFO - qlib.timer - [log.py:127] - Time cost: 1.821s | RobustZScoreNorm Done
+[28616:MainThread](2026-11-07 11:05:36,608) INFO - qlib.timer - [log.py:127] - Time cost: 0.334s | Fillna Done
+[28616:MainThread](2026-11-07 11:05:37,115) INFO - qlib.timer - [log.py:127] - Time cost: 0.135s | DropnaLabel Done
+/home/zhengzengrong/PredicateLab/audit_20261107_credibility/venv/lib/python3.10/site-packages/qlib/data/dataset/processor.py:363: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df[cols] = t
+[28616:MainThread](2026-11-07 11:05:37,196) INFO - qlib.timer - [log.py:127] - Time cost: 0.080s | CSRankNorm Done
+[28616:MainThread](2026-11-07 11:05:37,228) INFO - qlib.timer - [log.py:127] - Time cost: 3.143s | fit & process data Done
+[28616:MainThread](2026-11-07 11:05:37,230) INFO - qlib.timer - [log.py:127] - Time cost: 11.430s | Init data Done
+/home/zhengzengrong/PredicateLab/audit_20261107_credibility/src_copy/TSIL-main/src/dataset_ori_onehot.py:412: FutureWarning: Series.__getitem__ treating keys as positions is deprecated. In a future version, integer keys will always be treated as labels (consistent with DataFrame behavior). To access a value by position, use `ser.iloc[pos]`
+  label.append(self._label[slc.stop - 1])

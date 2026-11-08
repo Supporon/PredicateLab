@@ -1,0 +1,154 @@
+[
+  {
+    "file": "N2_seed3e-3_postfix.jsonl",
+    "n": 400,
+    "errors": 0,
+    "discovery_any": {
+      "k": 9,
+      "rate": 0.0225,
+      "wilson95": [
+        0.011881583530495034,
+        0.04220265755875813
+      ]
+    },
+    "confirmation_any": {
+      "k": 0,
+      "rate": 0.0,
+      "wilson95": [
+        0.0,
+        0.009512294334296508
+      ]
+    },
+    "final_positive": {
+      "k": 0,
+      "rate": 0.0,
+      "wilson95": [
+        0.0,
+        0.009512294334296508
+      ]
+    },
+    "mean_validated": 0.0275,
+    "mean_conf_confirmed": 0.0,
+    "total_validated": 11,
+    "true_family_validated": 0,
+    "total_conf_confirmed": 0,
+    "true_family_conf_confirmed": 0,
+    "true_family_final_positive": 0,
+    "round0_any_validated": 7,
+    "round1_any_validated": 2
+  },
+  {
+    "file": "N3_seed1.5e-3_famyr2e-3_postfix.jsonl",
+    "n": 400,
+    "errors": 0,
+    "discovery_any": {
+      "k": 6,
+      "rate": 0.015,
+      "wilson95": [
+        0.006892291919440893,
+        0.03233463358482672
+      ]
+    },
+    "confirmation_any": {
+      "k": 0,
+      "rate": 0.0,
+      "wilson95": [
+        0.0,
+        0.009512294334296508
+      ]
+    },
+    "final_positive": {
+      "k": 0,
+      "rate": 0.0,
+      "wilson95": [
+        0.0,
+        0.009512294334296508
+      ]
+    },
+    "mean_validated": 0.0175,
+    "mean_conf_confirmed": 0.0,
+    "total_validated": 7,
+    "true_family_validated": 0,
+    "total_conf_confirmed": 0,
+    "true_family_conf_confirmed": 0,
+    "true_family_final_positive": 0,
+    "round0_any_validated": 2,
+    "round1_any_validated": 5
+  },
+  {
+    "file": "P1_vol+4e-3_seed1.5e-3_famyr2e-3_postfix.jsonl",
+    "n": 400,
+    "errors": 0,
+    "discovery_any": {
+      "k": 110,
+      "rate": 0.275,
+      "wilson95": [
+        0.23353872471100914,
+        0.32074180773942434
+      ]
+    },
+    "confirmation_any": {
+      "k": 22,
+      "rate": 0.055,
+      "wilson95": [
+        0.03659849414955067,
+        0.08186744780797323
+      ]
+    },
+    "final_positive": {
+      "k": 2,
+      "rate": 0.005,
+      "wilson95": [
+        0.0013722529547103846,
+        0.018044918436243156
+      ]
+    },
+    "mean_validated": 0.6225,
+    "mean_conf_confirmed": 0.0825,
+    "total_validated": 249,
+    "true_family_validated": 245,
+    "total_conf_confirmed": 33,
+    "true_family_conf_confirmed": 33,
+    "true_family_final_positive": 2,
+    "round0_any_validated": 74,
+    "round1_any_validated": 88
+  },
+  {
+    "file": "P2_vol+1e-2_seed1.5e-3_famyr2e-3_postfix.jsonl",
+    "n": 400,
+    "errors": 0,
+    "discovery_any": {
+      "k": 397,
+      "rate": 0.9925,
+      "wilson95": [
+        0.9781842792759678,
+        0.9974461108047501
+      ]
+    },
+    "confirmation_any": {
+      "k": 375,
+      "rate": 0.9375,
+      "wilson95": [
+        0.909365883869693,
+        0.9573108585877976
+      ]
+    },
+    "final_positive": {
+      "k": 355,
+      "rate": 0.8875,
+      "wilson95": [
+        0.8527764306768796,
+        0.9148515412140404
+      ]
+    },
+    "mean_validated": 5.5725,
+    "mean_conf_confirmed": 4.4225,
+    "total_validated": 2229,
+    "true_family_validated": 2223,
+    "total_conf_confirmed": 1769,
+    "true_family_conf_confirmed": 1769,
+    "true_family_final_positive": 355,
+    "round0_any_validated": 395,
+    "round1_any_validated": 396
+  }
+]

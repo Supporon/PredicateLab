@@ -1,0 +1,2 @@
+3122650e76c96df4cabe029dd52bb4a31f6fec81080f35fa34c57207c6e19e4d  qlib_bin/calendars/day.txt
+c3f07c323fe2da962ae740428087860c80e006a6ae40e00134898bc446b138d0  qlib_bin/instruments/csi300.txt

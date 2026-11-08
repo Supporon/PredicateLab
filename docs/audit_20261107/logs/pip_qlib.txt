@@ -1,0 +1,56 @@
+  error: subprocess-exited-with-error
+  
+  × Preparing metadata (pyproject.toml) did not run successfully.
+  │ exit code: 1
+  ╰─> [34 lines of output]
+      + meson setup /tmp/pip-install-v9c0mk6t/scs_46fd94b4b04e4dc1b1446a4eb0532a22 /tmp/pip-install-v9c0mk6t/scs_46fd94b4b04e4dc1b1446a4eb0532a22/.mesonpy-z0r3xvk4 -Dbuildtype=release -Db_ndebug=if-release -Db_vscrt=md --native-file=/tmp/pip-install-v9c0mk6t/scs_46fd94b4b04e4dc1b1446a4eb0532a22/.mesonpy-z0r3xvk4/meson-python-native-file.ini
+      The Meson build system
+      Version: 1.12.1
+      Source dir: /tmp/pip-install-v9c0mk6t/scs_46fd94b4b04e4dc1b1446a4eb0532a22
+      Build dir: /tmp/pip-install-v9c0mk6t/scs_46fd94b4b04e4dc1b1446a4eb0532a22/.mesonpy-z0r3xvk4
+      Build type: native build
+      WARNING: Project does not target a minimum version but uses feature introduced in '1.1': meson.options file. Use meson_options.txt instead
+      Project name: scs
+      Project version: undefined
+      C compiler for the host machine: cc (gcc 4.8.5 "cc (GCC) 4.8.5 20150623 (Red Hat 4.8.5-44)")
+      C linker for the host machine: cc ld.bfd 9.1
+      Host machine cpu family: x86_64
+      Host machine cpu: x86_64
+      Program python found: YES (/home/zhengzengrong/PredicateLab/audit_20261107_credibility/venv/bin/python)
+      Library openblas found: NO
+      Found pkg-config: YES (/usr/bin/pkg-config) 0.27.1
+      Found CMake: /usr/bin/cmake (2.8.12.2)
+      WARNING: The version of CMake /usr/bin/cmake is 2.8.12.2 but version >=3.4 is required
+      Run-time dependency openblas found: NO  (tried pkg-config and cmake)
+      WARNING: The version of CMake /usr/bin/cmake is 2.8.12.2 but version >=3.4 is required
+      Run-time dependency openblas found: NO  (tried pkg-config and cmake)
+      Library blas found: NO
+      WARNING: The version of CMake /usr/bin/cmake is 2.8.12.2 but version >=3.4 is required
+      Run-time dependency blas found: NO  (tried pkg-config and cmake)
+      Library lapack found: NO
+      WARNING: The version of CMake /usr/bin/cmake is 2.8.12.2 but version >=3.4 is required
+      Run-time dependency lapack found: NO  (tried pkg-config and cmake)
+      Library cblas found: NO
+      WARNING: The version of CMake /usr/bin/cmake is 2.8.12.2 but version >=3.4 is required
+      Run-time dependency cblas found: NO  (tried pkg-config and cmake)
+      
+      ../meson.build:127:4: ERROR: Problem encountered: OpenBLAS or Netlib BLAS/CBLAS is required on all platforms, and was not found.
+      
+      A full log can be found at /tmp/pip-install-v9c0mk6t/scs_46fd94b4b04e4dc1b1446a4eb0532a22/.mesonpy-z0r3xvk4/meson-logs/meson-log.txt
+      [end of output]
+  
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+error: metadata-generation-failed
+
+× Encountered error while generating package metadata.
+╰─> See above for output.
+
+note: This is an issue with the package mentioned above, not pip.
+hint: See above for details.
+
+[notice] A new release of pip is available: 23.0.1 -> 26.3
+[notice] To update, run: /home/zhengzengrong/PredicateLab/audit_20261107_credibility/venv/bin/python -m pip install --upgrade pip
+exit=1
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+ModuleNotFoundError: No module named 'qlib'

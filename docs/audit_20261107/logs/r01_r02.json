@@ -1,0 +1,84 @@
+{
+  "audited_file": "/home/zhengzengrong/PredicateLab/audit_20261107_credibility/../Predicate_Lab_v1.1/TSIL-main/src/dataset_ori_onehot.py",
+  "sha256": "f35d9b8b0a2f0bc9fa51810bc4bc658a58bb6f55e2bb349acc13a5fb5c13da4d",
+  "R01": {
+    "n_samples": 43,
+    "n_windows_with_foreign_instrument_rows": 8,
+    "expected": 0,
+    "examples": [
+      {
+        "target": [
+          "B",
+          "2020-01-31"
+        ],
+        "foreign_rows": [
+          [
+            "A",
+            "2020-02-06"
+          ],
+          [
+            "A",
+            "2020-02-07"
+          ],
+          [
+            "A",
+            "2020-02-10"
+          ],
+          [
+            "A",
+            "2020-02-11"
+          ]
+        ]
+      },
+      {
+        "target": [
+          "B",
+          "2020-02-03"
+        ],
+        "foreign_rows": [
+          [
+            "A",
+            "2020-02-07"
+          ],
+          [
+            "A",
+            "2020-02-10"
+          ],
+          [
+            "A",
+            "2020-02-11"
+          ]
+        ]
+      },
+      {
+        "target": [
+          "B",
+          "2020-02-04"
+        ],
+        "foreign_rows": [
+          [
+            "A",
+            "2020-02-10"
+          ],
+          [
+            "A",
+            "2020-02-11"
+          ]
+        ]
+      }
+    ],
+    "note": "B's first windows contain A's LAST rows (A's latest dates, i.e. later than B's target date)"
+  },
+  "R02": {
+    "eligible_samples": 1723,
+    "emitted_in_eval": 1600,
+    "dropped": 123,
+    "dropped_index_range": [
+      1600,
+      1722
+    ],
+    "eval_drop_last": true,
+    "expected_dropped": 0,
+    "note": "batch_slices are ordered by instrument then date, so the dropped tail is always the alphabetically last instrument(s)"
+  }
+}

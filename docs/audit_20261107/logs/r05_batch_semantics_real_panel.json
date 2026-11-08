@@ -1,0 +1,65 @@
+{
+  "fold": {
+    "fold_id": "f2020",
+    "kind": "time",
+    "role": "search",
+    "train_start": "2018-01-01",
+    "train_end": "2019-12-25",
+    "valid_start": "2020-01-07",
+    "valid_end": "2020-12-29",
+    "test_start": null,
+    "test_end": null,
+    "purge_days": 2,
+    "embargo_days": 3,
+    "metadata": {},
+    "notes": "effective train_end=2019-12-27, valid_start=2020-01-07; label isolation trimmed train_end 2019-12-27->2019-12-25 (tail labels need prices at/after valid_start); label isolation trimmed valid_end 2020-12-31->2020-12-29 (2 dates need later prices)"
+  },
+  "batch_size": 800,
+  "shuffle": true,
+  "batches": [
+    {
+      "batch": 0,
+      "n_samples": 800,
+      "n_target_dates": 376,
+      "target_date_min": "2018-01-02",
+      "target_date_max": "2019-10-16",
+      "largest_same_date_group": 7,
+      "median_samples_per_date": 2,
+      "dates_with_at_least_3_samples": 115,
+      "n_instruments": 306
+    },
+    {
+      "batch": 1,
+      "n_samples": 800,
+      "n_target_dates": 362,
+      "target_date_min": "2018-01-02",
+      "target_date_max": "2019-10-16",
+      "largest_same_date_group": 7,
+      "median_samples_per_date": 2,
+      "dates_with_at_least_3_samples": 127,
+      "n_instruments": 313
+    },
+    {
+      "batch": 2,
+      "n_samples": 800,
+      "n_target_dates": 358,
+      "target_date_min": "2018-01-02",
+      "target_date_max": "2019-10-16",
+      "largest_same_date_group": 8,
+      "median_samples_per_date": 2,
+      "dates_with_at_least_3_samples": 120,
+      "n_instruments": 318
+    },
+    {
+      "batch": 3,
+      "n_samples": 800,
+      "n_target_dates": 363,
+      "target_date_min": "2018-01-02",
+      "target_date_max": "2019-10-16",
+      "largest_same_date_group": 7,
+      "median_samples_per_date": 2,
+      "dates_with_at_least_3_samples": 127,
+      "n_instruments": 309
+    }
+  ]
+}

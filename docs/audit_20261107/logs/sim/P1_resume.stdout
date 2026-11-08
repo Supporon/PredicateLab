@@ -1,0 +1,11 @@
+Exception in thread Thread-3 (_handle_results):
+Traceback (most recent call last):
+  File "/home/zhengzengrong/miniconda3/envs/zzr_py10/lib/python3.10/threading.py", line 1016, in _bootstrap_inner
+    self.run()
+  File "/home/zhengzengrong/miniconda3/envs/zzr_py10/lib/python3.10/threading.py", line 953, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/zhengzengrong/miniconda3/envs/zzr_py10/lib/python3.10/multiprocessing/pool.py", line 579, in _handle_results
+    task = get()
+  File "/home/zhengzengrong/miniconda3/envs/zzr_py10/lib/python3.10/multiprocessing/connection.py", line 251, in recv
+    return _ForkingPickler.loads(buf.getbuffer())
+ModuleNotFoundError: No module named 'predicatelab'

@@ -1,0 +1,8 @@
+  /home/zhengzengrong/PredicateLab/audit_20261107_credibility/src_copy/TSIL-main/src/models/master.py:43: DeprecationWarning:
+  
+  invalid escape sequence '\o'
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_adversarial_label_isolation.py:111: real qlib calendar/instruments not available
+128 passed, 1 skipped, 2 warnings in 17.24s

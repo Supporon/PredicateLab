@@ -1,0 +1,132 @@
+{
+  "file": "N0_iid.jsonl",
+  "n": 400,
+  "errors": 0,
+  "discovery_any": {
+    "k": 0,
+    "rate": 0.0,
+    "wilson95": [
+      0.0,
+      0.009512294334296508
+    ]
+  },
+  "confirmation_any": {
+    "k": 0,
+    "rate": 0.0,
+    "wilson95": [
+      0.0,
+      0.009512294334296508
+    ]
+  },
+  "final_positive": {
+    "k": 0,
+    "rate": 0.0,
+    "wilson95": [
+      0.0,
+      0.009512294334296508
+    ]
+  },
+  "mean_validated": 0.0,
+  "mean_conf_confirmed": 0.0,
+  "round0_any_validated": 0,
+  "round1_any_validated": 0
+}
+{
+  "file": "N1_seed1.5e-3.jsonl",
+  "n": 400,
+  "errors": 0,
+  "discovery_any": {
+    "k": 0,
+    "rate": 0.0,
+    "wilson95": [
+      0.0,
+      0.009512294334296508
+    ]
+  },
+  "confirmation_any": {
+    "k": 0,
+    "rate": 0.0,
+    "wilson95": [
+      0.0,
+      0.009512294334296508
+    ]
+  },
+  "final_positive": {
+    "k": 0,
+    "rate": 0.0,
+    "wilson95": [
+      0.0,
+      0.009512294334296508
+    ]
+  },
+  "mean_validated": 0.0,
+  "mean_conf_confirmed": 0.0,
+  "round0_any_validated": 0,
+  "round1_any_validated": 0
+}
+{
+  "file": "N2_seed3e-3.jsonl",
+  "n": 400,
+  "errors": 0,
+  "discovery_any": {
+    "k": 13,
+    "rate": 0.0325,
+    "wilson95": [
+      0.01908984237880045,
+      0.0548041528237668
+    ]
+  },
+  "confirmation_any": {
+    "k": 0,
+    "rate": 0.0,
+    "wilson95": [
+      0.0,
+      0.009512294334296508
+    ]
+  },
+  "final_positive": {
+    "k": 0,
+    "rate": 0.0,
+    "wilson95": [
+      0.0,
+      0.009512294334296508
+    ]
+  },
+  "mean_validated": 0.0375,
+  "mean_conf_confirmed": 0.0,
+  "round0_any_validated": 8,
+  "round1_any_validated": 5
+}
+{
+  "file": "N3_seed1.5e-3_famyr2e-3.jsonl",
+  "n": 400,
+  "errors": 0,
+  "discovery_any": {
+    "k": 4,
+    "rate": 0.01,
+    "wilson95": [
+      0.0038954837949909914,
+      0.025426564652619586
+    ]
+  },
+  "confirmation_any": {
+    "k": 0,
+    "rate": 0.0,
+    "wilson95": [
+      0.0,
+      0.009512294334296508
+    ]
+  },
+  "final_positive": {
+    "k": 0,
+    "rate": 0.0,
+    "wilson95": [
+      0.0,
+      0.009512294334296508
+    ]
+  },
+  "mean_validated": 0.01,
+  "mean_conf_confirmed": 0.0,
+  "round0_any_validated": 2,
+  "round1_any_validated": 2
+}
