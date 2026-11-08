@@ -126,16 +126,25 @@ class PredicateTemplate(BaseModel):
 
     @property
     def content_hash(self) -> str:
+        desc = self.descriptor
+        if self.domain == "tsil" or (isinstance(desc, dict) and desc.get("family") in {"composite", "weighted_p", "concat"}):
+            from predicatelab.domains.tsil.dsl import canonicalize_descriptor
+
+            desc = canonicalize_descriptor(desc)
         return sha256_obj(
             {
                 "domain": self.domain,
                 "kind": self.kind.value,
-                "descriptor": self.descriptor,
+                "descriptor": desc,
                 "schema_version": self.schema_version,
             }
         )
 
     def ensure_id(self) -> "PredicateTemplate":
+        if self.domain == "tsil" or (isinstance(self.descriptor, dict) and self.descriptor.get("family") in {"composite", "weighted_p", "concat"}):
+            from predicatelab.domains.tsil.dsl import canonicalize_descriptor
+
+            self.descriptor = canonicalize_descriptor(self.descriptor)
         if not self.template_id:
             self.template_id = short_id("tpl", self.content_hash)
         return self
@@ -314,6 +323,9 @@ class SearchPolicy(BaseModel):
     # V1.1: partial execution must not become a validated conclusion.
     min_fold_coverage: float = 0.75
     min_seed_agreement: float = 0.5
+    require_positive_ci: bool = True
+    require_beat_control: bool = True
+    min_control_delta: float = 0.0
     bootstrap_samples: int = 1000
     bootstrap_block: int = 5
     nw_lag: int = 5

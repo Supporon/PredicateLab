@@ -66,8 +66,10 @@ from predicatelab.core.schema import (
 )
 from predicatelab.core.stats import (
     benjamini_hochberg,
+    effective_num_tests,
     paired_effect,
     pool_fold_series,
+    romano_wolf_stepdown,
     stability,
 )
 from predicatelab.core.store import StateStore, result_digest
@@ -362,6 +364,8 @@ class PredicateLabEngine:
                 pass
             stored_protocol = existing.get("protocol_hash")
             stored_snapshot = existing.get("snapshot_hash")
+            stored_code = existing.get("code_fingerprint")
+            current_code = code.get("dirty_fingerprint", "")
             if stored_protocol and stored_protocol != protocol_hash:
                 raise ProtocolViolation(
                     f"run {self.run_id} was created with protocol {stored_protocol[:16]}, "
@@ -371,6 +375,11 @@ class PredicateLabEngine:
                 raise ProtocolViolation(
                     f"run {self.run_id} snapshot changed ({stored_snapshot[:16]} -> "
                     f"{snapshot.manifest_hash[:16]}); cached baselines are invalid"
+                )
+            if stored_code and current_code and stored_code != current_code:
+                raise ProtocolViolation(
+                    f"run {self.run_id} code_fingerprint changed ({stored_code[:16]} -> "
+                    f"{current_code[:16]}); refusing to mix code versions within a run"
                 )
         else:
             self.store.create_run(
@@ -554,6 +563,15 @@ class PredicateLabEngine:
         if pred_path and Path(pred_path).exists():
             pred_sha = pred_sha or sha256_file(Path(pred_path))
 
+        # Trained weights are optional adapter output (worker ``models/``
+        # directory).  Keep them in the worker metadata rather than adding a
+        # schema column: the result hash stays stable for existing databases.
+        worker_meta = dict(result.get("worker", {}) or {})
+        for key in ("model_path", "model_sha256"):
+            value = str(result.get(key, "") or "")
+            if value:
+                worker_meta.setdefault(key, value)
+
         payload = {
             "status": status, "metrics": metrics, "metric_series": series,
             "fitted_params": fitted, "predictions_path": pred_path,
@@ -570,7 +588,7 @@ class PredicateLabEngine:
             metrics=metrics, metric_series=series, fitted_params=fitted,
             predictions_path=pred_path,
             duration_s=float(result.get("duration_s", duration) or duration),
-            error=error, worker=result.get("worker", {}) or {},
+            error=error, worker=worker_meta,
             started_at=started.isoformat(), finished_at=finished,
         )
         self.store.record_attempt(trial, run_id=self.run_id)
@@ -594,6 +612,163 @@ class PredicateLabEngine:
             request.candidate_id, request.fold.fold_id,
             request.protocol_hash, request.config_hash,
         ) or trial.model_dump(mode="json")
+
+    def run_trials_batch(self, requests: list[TrialRequest]) -> list[dict[str, Any]]:
+        """Execute a batch of TrialRequests using up to ``execution.workers`` parallel worker threads
+        while keeping all SQLite store reads and writes strictly on the main thread."""
+        max_w = self._max_workers()
+        if max_w <= 1 or len(requests) <= 1:
+            return [self.run_trial(req) for req in requests]
+
+        from concurrent.futures import ThreadPoolExecutor
+
+        ctx = self._ctx
+        assert ctx is not None
+
+        # Deduplicate requests by (candidate_id, fold_id, protocol_hash, config_hash)
+        unique_pending: list[tuple[TrialRequest, int, datetime]] = []
+        seen_keys: set[tuple[str, str, str, str]] = set()
+        for req in requests:
+            key = (req.candidate_id, req.fold.fold_id, req.protocol_hash, req.config_hash)
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            cached = self.store.get_cached_trial(*key)
+            if cached:
+                continue
+            prior = self.store.get_trial_by_key(*key)
+            attempt = int(prior.get("attempt", 0)) + 1 if prior else 1
+            req.attempt = attempt
+            started = datetime.now(timezone.utc)
+            running = TrialRecord(
+                candidate_id=req.candidate_id,
+                fold_id=req.fold.fold_id,
+                protocol_hash=req.protocol_hash,
+                config_hash=req.config_hash,
+                status="running",
+                phase=req.phase,
+                seed=req.seed,
+                snapshot_hash=req.snapshot_hash,
+                identity_hash=req.config_hash,
+                attempt=attempt,
+                started_at=started.isoformat(),
+            )
+            self.store.record_attempt(running, run_id=self.run_id)
+            workdir = Path(req.workdir)
+            for name in ("result.json", "trial_result.json", "worker_result.json"):
+                stale = workdir / name
+                if stale.exists():
+                    stale.unlink()
+            unique_pending.append((req, attempt, started))
+
+        def _exec_adapter(req: TrialRequest) -> dict[str, Any]:
+            try:
+                return ctx.adapter.run_trial(req) or {}
+            except Exception as exc:
+                return {
+                    "status": "failed",
+                    "metrics": {},
+                    "metric_series": {},
+                    "fitted_params": {},
+                    "predictions_path": "",
+                    "duration_s": 0.0,
+                    "error": f"{type(exc).__name__}: {exc}\n{traceback.format_exc()}",
+                    "worker": {},
+                }
+
+        if unique_pending:
+            with ThreadPoolExecutor(max_workers=min(max_w, len(unique_pending))) as pool:
+                raw_results = list(pool.map(_exec_adapter, [item[0] for item in unique_pending]))
+
+            for (req, attempt, started), result in zip(unique_pending, raw_results):
+                duration = (datetime.now(timezone.utc) - started).total_seconds()
+                finished = datetime.now(timezone.utc).isoformat()
+                metrics, null_metrics = sanitise_json(result.get("metrics", {}) or {})
+                series, null_series = sanitise_json(result.get("metric_series", {}) or {})
+                fitted, null_fitted = sanitise_json(result.get("fitted_params", {}) or {})
+                null_paths = [*null_metrics, *null_series, *null_fitted]
+                status = str(result.get("status", "failed"))
+                error = str(result.get("error", "") or "")
+                if status == "success" and null_paths:
+                    status = "failed"
+                    error = (
+                        f"non-finite result rejected at {null_paths[:5]}; NaN/Inf cannot be a success; "
+                        + error
+                    ).strip("; ")
+                if status == "success" and not metrics and not series:
+                    status = "failed"
+                    error = "worker returned success with empty metrics and metric_series"
+                if status not in {"success", "failed", "interrupted", "skipped"}:
+                    status = "failed"
+                    error = f"unknown worker status {result.get('status')!r}; " + error
+                if status != "success" and null_paths:
+                    error = (error + f"; null paths: {null_paths[:20]}").strip("; ")
+
+                pred_path = str(result.get("predictions_path", "") or "")
+                pred_sha = str(result.get("predictions_sha256", "") or "")
+                if pred_path and Path(pred_path).exists():
+                    pred_sha = pred_sha or sha256_file(Path(pred_path))
+
+                payload = {
+                    "status": status,
+                    "metrics": metrics,
+                    "metric_series": series,
+                    "fitted_params": fitted,
+                    "predictions_path": pred_path,
+                    "predictions_sha256": pred_sha,
+                    "null_paths": null_paths,
+                }
+                trial = TrialRecord(
+                    candidate_id=req.candidate_id,
+                    fold_id=req.fold.fold_id,
+                    protocol_hash=req.protocol_hash,
+                    config_hash=req.config_hash,
+                    status=status,
+                    phase=req.phase,
+                    seed=req.seed,
+                    snapshot_hash=req.snapshot_hash,
+                    identity_hash=req.config_hash,
+                    attempt=attempt,
+                    result_hash=result_digest(payload),
+                    predictions_sha256=pred_sha,
+                    null_paths=null_paths,
+                    metrics=metrics,
+                    metric_series=series,
+                    fitted_params=fitted,
+                    predictions_path=pred_path,
+                    duration_s=float(result.get("duration_s", duration) or duration),
+                    error=error,
+                    worker=result.get("worker", {}) or {},
+                    started_at=started.isoformat(),
+                    finished_at=finished,
+                )
+                self.store.record_attempt(trial, run_id=self.run_id)
+                self.store.record_trial(trial, run_id=self.run_id)
+                if status == "success" and fitted:
+                    self.store.add_fitted_instance(
+                        FittedInstance(
+                            candidate_id=req.candidate_id,
+                            fold_id=req.fold.fold_id,
+                            fitted_params=fitted,
+                            fit_data_hash=result.get("fit_data_hash")
+                            or sha256_obj(
+                                {
+                                    "fold": req.fold.model_dump(mode="json"),
+                                    "candidate": req.candidate_id,
+                                    "snapshot": req.snapshot_hash,
+                                    "config": req.config_hash,
+                                }
+                            ),
+                        )
+                    )
+                if status != "success":
+                    print(
+                        f"[trial-failed] {req.candidate_id} {req.fold.fold_id} "
+                        f"seed={req.seed} phase={req.phase}: "
+                        f"{error.splitlines()[0] if error else 'unknown'}"
+                    )
+
+        return [self.run_trial(req) for req in requests]
 
     def _ensure_variant(self, variant_id: str, variant: str, fold: FoldSpec,
                         phase: str, seed: int, *, control_kind: str = "") -> dict[str, Any]:
@@ -638,7 +813,9 @@ class PredicateLabEngine:
     # -------------------------------------------------------------- evidence
     def _seed_aggregate(self, seed: int, cand_series: Mapping[str, Mapping[str, float]],
                         base_series: Mapping[str, Mapping[str, float]],
-                        fold_metrics: Mapping[str, dict]) -> dict[str, Any]:
+                        fold_metrics: Mapping[str, dict],
+                        ctrl_series: Mapping[str, Mapping[str, float]] | None = None,
+                        ctrl_variant: str = "") -> dict[str, Any]:
         policy = self._ctx.policy
         try:
             pooled_c = pool_fold_series(cand_series)
@@ -655,7 +832,13 @@ class PredicateLabEngine:
         # not a time-series p-value/CI.  Report that explicitly as ``None`` plus
         # ``inferential=False`` instead of a NaN that could sneak into success.
         inferential = n_dates >= 2
-        return {
+        common_keys = sorted(set(pooled_c) & set(pooled_b))
+        delta_series = {
+            str(k): float(pooled_c[k] - pooled_b[k])
+            for k in common_keys
+            if _finite(pooled_c[k]) and _finite(pooled_b[k])
+        }
+        out: dict[str, Any] = {
             "seed": seed,
             "effect": eff["effect"],
             "ci_low": eff["ci_low"] if inferential else None,
@@ -669,7 +852,25 @@ class PredicateLabEngine:
             "fold_effects": fold_effects, "folds": dict(fold_metrics),
             "mean_candidate": float(np.mean(list(pooled_c.values()))) if pooled_c else None,
             "mean_baseline": float(np.mean(list(pooled_b.values()))) if pooled_b else None,
+            "delta_series": delta_series,
         }
+        if ctrl_series:
+            try:
+                pooled_ctrl = pool_fold_series(ctrl_series)
+                ctrl_eff = paired_effect(
+                    pooled_c, pooled_ctrl, nw_lag=policy.nw_lag,
+                    n_boot=policy.bootstrap_samples, block=policy.bootstrap_block, seed=seed,
+                )
+                ctrl_inferential = int(ctrl_eff["n_dates"]) >= 2
+                out["control_variant"] = ctrl_variant
+                out["control_effect"] = ctrl_eff["effect"]
+                out["control_ci_low"] = ctrl_eff["ci_low"] if ctrl_inferential else None
+                out["control_ci_high"] = ctrl_eff["ci_high"] if ctrl_inferential else None
+                out["control_p_value"] = ctrl_eff["p_value"] if ctrl_inferential else None
+                out["mean_control"] = float(np.mean(list(pooled_ctrl.values()))) if pooled_ctrl else None
+            except ValueError as exc:
+                return {"error": f"control series pooling error: {exc}"}
+        return out
 
     def _aggregate(self, per_seed: Mapping[int, dict[str, Any]], *,
                    n_expected_folds: int, failures: list[str]) -> dict[str, Any]:
@@ -698,6 +899,13 @@ class PredicateLabEngine:
         stab = float(np.mean(stabs)) if stabs else float("nan")
         seed_effects = {str(s): usable[s]["effect"] for s in seeds}
         agreement = float(np.mean([(direction * e) > 0 for e in effects])) if effects else float("nan")
+        # Combine delta_series across seeds (mean paired difference per date/sample key)
+        all_delta_keys = sorted({k for s in seeds for k in (usable[s].get("delta_series") or {})})
+        pooled_delta: dict[str, float] = {}
+        for k in all_delta_keys:
+            vals = [usable[s]["delta_series"][k] for s in seeds if k in (usable[s].get("delta_series") or {})]
+            if vals:
+                pooled_delta[k] = float(np.mean(vals))
         out = {
             "effect": eff,
             "ci_low": ci_low,
@@ -714,7 +922,10 @@ class PredicateLabEngine:
             "fold_effects": fold_effects,
             "folds": primary.get("folds", {}),
             "seed_effects": seed_effects,
-            "per_seed": {str(s): {k: v for k, v in usable[s].items() if k != "folds"} for s in seeds},
+            "per_seed": {
+                str(s): {k: v for k, v in usable[s].items() if k not in {"folds", "delta_series"}}
+                for s in seeds
+            },
             "seed_effect_sd": _std(effects),
             "fold_effect_sd": _std(list(fold_effects.values())),
             "time_series_ci": [primary.get("ci_low"), primary.get("ci_high")],
@@ -724,7 +935,29 @@ class PredicateLabEngine:
             "failed_folds": failures,
             "mean_candidate": primary.get("mean_candidate"),
             "mean_baseline": primary.get("mean_baseline"),
+            "delta_series": pooled_delta,
         }
+        ctrl_effects = [
+            usable[s]["control_effect"] for s in seeds if _finite(usable[s].get("control_effect"))
+        ]
+        if ctrl_effects or primary.get("control_variant"):
+            ctrl_pvals = [
+                usable[s]["control_p_value"] for s in seeds if _finite(usable[s].get("control_p_value"))
+            ]
+            ctrl_lo = [
+                usable[s]["control_ci_low"] for s in seeds if _finite(usable[s].get("control_ci_low"))
+            ]
+            ctrl_hi = [
+                usable[s]["control_ci_high"] for s in seeds if _finite(usable[s].get("control_ci_high"))
+            ]
+            out["control_variant"] = primary.get("control_variant") or (
+                self._ctx.protocol.control_variant if self._ctx else ""
+            )
+            out["control_effect"] = float(np.mean(ctrl_effects)) if ctrl_effects else None
+            out["control_p_value"] = max(ctrl_pvals) if ctrl_pvals else None
+            out["control_ci_low"] = min(ctrl_lo) if ctrl_lo else None
+            out["control_ci_high"] = max(ctrl_hi) if ctrl_hi else None
+            out["mean_control"] = primary.get("mean_control")
         for key in ("effect", "stability", "fold_coverage"):
             if not _finite(out.get(key)):
                 return {"error": f"non-finite aggregate {key}={out.get(key)!r}; " + "; ".join(failures[:3])}
@@ -739,9 +972,22 @@ class PredicateLabEngine:
         rounds = int(rounds if rounds is not None else self.run_cfg.get("rounds", 1))
         self._persist_context()
         run_row = self.store.get_run(self.run_id) or {}
-        if run_row.get("status") in {"search_complete", "confirmation_complete", "final_complete"}:
-            existing = {r["round_index"] for r in self.store.list_rounds(self.run_id)
-                        if r["status"] == "completed"}
+        frozen_family = self.store.get_frozen_family(self.run_id)
+        existing = {r["round_index"] for r in self.store.list_rounds(self.run_id)
+                    if r["status"] == "completed"}
+        if frozen_family is not None or run_row.get("status") in {
+            "confirmation_complete", "final_complete", "final_failed"
+        }:
+            if rounds > len(existing):
+                raise ProtocolViolation(
+                    f"run {self.run_id} is frozen / post-discovery "
+                    f"(status={run_row.get('status')!r}, frozen_family={bool(frozen_family)}); "
+                    f"refusing to append new discovery rounds ({len(existing)} -> {rounds})"
+                )
+            print(f"[run] {self.run_id} already post-freeze, reusing")
+            self._write_report()
+            return self.run_id
+        if run_row.get("status") == "search_complete":
             if len(existing) >= rounds:
                 print(f"[run] {self.run_id} already search-complete, reusing")
                 self._write_report()
@@ -922,6 +1168,15 @@ class PredicateLabEngine:
         if not base_screen_series:
             raise RuntimeError(f"baseline screen series is empty on {screen_fold.fold_id}")
 
+        if self._max_workers() > 1 and len(candidates) > 1:
+            screen_reqs = [
+                self._trial_config(
+                    c_row["candidate_id"], "candidate", c_row["descriptor"], screen_fold, "screen", seed
+                )
+                for c_row, _ in candidates
+            ]
+            self.run_trials_batch(screen_reqs)
+
         screen_results = []
         for cand_row, _probe_res in candidates:
             req = self._trial_config(cand_row["candidate_id"], "candidate",
@@ -1037,11 +1292,28 @@ class PredicateLabEngine:
         prior_qvals = all_qvals[: len(prior_full_rows)]
         qvals = all_qvals[len(prior_full_rows) :]
 
+        all_metrics_list = [
+            *(dict(r.get("metrics") or {}) for r in prior_full_rows),
+            *(dict(e.metrics or {}) for e in evidence_rows),
+        ]
+        m_eff, all_rw_pvals = self._compute_family_multiplicity(
+            all_metrics_list,
+            nw_lag=policy.nw_lag,
+            n_boot=min(500, policy.bootstrap_samples),
+            block=policy.bootstrap_block,
+            seed=policy.seed,
+        )
+        prior_rw_pvals = all_rw_pvals[: len(prior_full_rows)]
+        rw_pvals = all_rw_pvals[len(prior_full_rows) :]
+
         affected_prior_rounds: set[str] = set()
-        for r_dict, q in zip(prior_full_rows, prior_qvals):
+        for r_dict, q, rw_p in zip(prior_full_rows, prior_qvals, prior_rw_pvals):
             q_clean = q if q is not None and math.isfinite(q) else None
             if q_clean is None:
                 continue
+            prior_metrics = dict(r_dict.get("metrics") or {})
+            prior_metrics["effective_num_tests"] = m_eff
+            prior_metrics["rw_p_value"] = rw_p
             prior_ev = EvidenceRecord(
                 evidence_id=r_dict["evidence_id"],
                 candidate_id=r_dict["candidate_id"],
@@ -1058,11 +1330,15 @@ class PredicateLabEngine:
                 q_value=q_clean,
                 n_folds=r_dict["n_folds"],
                 stability=r_dict["stability"],
-                metrics=dict(r_dict.get("metrics") or {}),
+                metrics=prior_metrics,
                 reason=r_dict["reason"] or "",
             )
             eff_prior = direction * (prior_ev.effect or 0.0)
-            changed = (r_dict.get("q_value") != q_clean)
+            changed = (
+                r_dict.get("q_value") != q_clean
+                or (r_dict.get("metrics") or {}).get("rw_p_value") != rw_p
+                or (r_dict.get("metrics") or {}).get("effective_num_tests") != m_eff
+            )
             if prior_ev.status == EvidenceStatus.VALIDATED and q_clean > policy.fdr_alpha:
                 prior_ev.status = EvidenceStatus.INSUFFICIENT_EVIDENCE
                 prior_ev.state = CandidateState.INSUFFICIENT
@@ -1103,8 +1379,10 @@ class PredicateLabEngine:
                 ),
             )
 
-        for ev, q in zip(evidence_rows, qvals):
+        for ev, q, rw_p in zip(evidence_rows, qvals, rw_pvals):
             ev.q_value = q if q is not None and math.isfinite(q) else None
+            ev.metrics["effective_num_tests"] = m_eff
+            ev.metrics["rw_p_value"] = rw_p
             if ev.q_value is None:
                 continue
             effect = direction * (ev.effect or 0.0)
@@ -1119,6 +1397,8 @@ class PredicateLabEngine:
             self.store.record_evidence(ev, run_id=self.run_id)
 
         summary = self._round_summary(round_rec, screen_results, evidence_rows)
+        summary["effective_num_tests"] = m_eff
+        summary["rw_p_values"] = {e.candidate_id: e.metrics.get("rw_p_value") for e in evidence_rows}
         summary["proposals"] = [t.model_dump(mode="json") for t in templates]
         summary["identity_hash"] = ctx.context_hash
         summary["label_isolation"] = ctx.label_report
@@ -1197,12 +1477,37 @@ class PredicateLabEngine:
         ctx = self._ctx
         assert ctx is not None
         metric = ctx.protocol.primary_metric
+        ctrl_variant = str(ctx.protocol.control_variant or "").strip()
         per_seed: dict[int, dict[str, Any]] = {}
         failures: list[str] = []
         n_expected = len(folds)
+        if self._max_workers() > 1:
+            batch_reqs: list[TrialRequest] = []
+            for seed in seeds:
+                for fold in folds:
+                    ctx.guard.assert_fold_accessible(fold.fold_id, purpose)
+                    batch_reqs.append(
+                        self._trial_config(
+                            cand["candidate_id"], "candidate", cand["descriptor"], fold, phase, seed
+                        )
+                    )
+                    batch_reqs.append(
+                        self._trial_config(
+                            ctx.protocol.baseline_variant, "baseline", {}, fold, phase, seed
+                        )
+                    )
+                    if ctrl_variant:
+                        batch_reqs.append(
+                            self._trial_config(
+                                ctrl_variant, "control", {}, fold, phase, seed, control_kind=ctrl_variant
+                            )
+                        )
+            self.run_trials_batch(batch_reqs)
+
         for seed in seeds:
             cand_series: dict[str, dict] = {}
             base_series: dict[str, dict] = {}
+            ctrl_series: dict[str, dict] = {}
             fold_metrics: dict[str, dict] = {}
             for fold in folds:
                 ctx.guard.assert_fold_accessible(fold.fold_id, purpose)
@@ -1230,7 +1535,7 @@ class PredicateLabEngine:
                 base_series[fold.fold_id] = bs
                 eff = paired_effect(cs, bs, nw_lag=ctx.policy.nw_lag, n_boot=200,
                                     block=ctx.policy.bootstrap_block, seed=seed)
-                fold_metrics[fold.fold_id] = {
+                fm_entry: dict[str, Any] = {
                     "candidate": {k: cand_res["metrics"].get(k) for k in
                                   (metric, "ic", "rank_ic", "icir", "mse", "mae", "n_dates")},
                     "baseline": {k: base_res["metrics"].get(k) for k in
@@ -1239,7 +1544,32 @@ class PredicateLabEngine:
                     "candidate_config_hash": cand_res.get("config_hash"),
                     "baseline_config_hash": base_res.get("config_hash"),
                 }
-            per_seed[seed] = self._seed_aggregate(seed, cand_series, base_series, fold_metrics)
+                if ctrl_variant:
+                    ctrl_res = self._ensure_variant(
+                        ctrl_variant, "control", fold, phase, seed, control_kind=ctrl_variant
+                    )
+                    if ctrl_res["status"] == "success":
+                        ctrl_s = ctrl_res.get("metric_series", {}).get(metric, {})
+                        if ctrl_s:
+                            ctrl_series[fold.fold_id] = ctrl_s
+                            ctrl_eff = paired_effect(
+                                cs, ctrl_s, nw_lag=ctx.policy.nw_lag, n_boot=200,
+                                block=ctx.policy.bootstrap_block, seed=seed
+                            )
+                            fm_entry["control_variant"] = ctrl_variant
+                            fm_entry["control"] = {
+                                k: ctrl_res["metrics"].get(k) for k in
+                                (metric, "ic", "rank_ic", "icir", "mse", "mae", "n_dates")
+                            }
+                            fm_entry["control_effect"] = ctrl_eff["effect"]
+                            fm_entry["control_p_value"] = ctrl_eff["p_value"]
+                            fm_entry["control_config_hash"] = ctrl_res.get("config_hash")
+                fold_metrics[fold.fold_id] = fm_entry
+            per_seed[seed] = self._seed_aggregate(
+                seed, cand_series, base_series, fold_metrics,
+                ctrl_series=ctrl_series if ctrl_series else None,
+                ctrl_variant=ctrl_variant,
+            )
         return per_seed, failures, n_expected
 
     def _classify(self, agg: dict[str, Any], policy: SearchPolicy) -> EvidenceStatus:
@@ -1256,31 +1586,90 @@ class PredicateLabEngine:
             return EvidenceStatus.INSUFFICIENT_EVIDENCE
         direction = 1 if self._ctx.protocol.direction == "higher" else -1
         effect = direction * agg["effect"]
-        if effect >= policy.min_effect and agg["stability"] >= policy.min_stability \
-                and agg["p_value"] <= policy.fdr_alpha:
+        ci_ok = True
+        explicit_pos_ci = "require_positive_ci" in (self.config.get("search") or {})
+        if policy.require_positive_ci and (policy.min_effect >= 0.0 or explicit_pos_ci):
+            if direction > 0:
+                ci_low = agg.get("ci_low")
+                ci_ok = _finite(ci_low) and float(ci_low) > 0.0
+            else:
+                ci_high = agg.get("ci_high")
+                ci_ok = _finite(ci_high) and float(ci_high) < 0.0
+        ctrl_ok = True
+        ctrl_variant = agg.get("control_variant") or (
+            self._ctx.protocol.control_variant if self._ctx else ""
+        )
+        if ctrl_variant and policy.require_beat_control and (
+            "control_effect" in agg or agg.get("control_variant")
+        ):
+            ctrl_eff_raw = agg.get("control_effect")
+            if not _finite(ctrl_eff_raw):
+                ctrl_ok = False
+            else:
+                ctrl_impr = direction * float(ctrl_eff_raw)
+                min_delta = float(policy.min_control_delta)
+                ctrl_ok = (ctrl_impr > 0.0) if min_delta == 0.0 else (ctrl_impr >= min_delta)
+        if (
+            effect >= policy.min_effect
+            and agg["stability"] >= policy.min_stability
+            and agg["p_value"] <= policy.fdr_alpha
+            and ci_ok
+            and ctrl_ok
+        ):
             return EvidenceStatus.VALIDATED
-        if effect <= -policy.min_effect and agg["p_value"] <= policy.fdr_alpha:
+        if effect < 0.0 and effect <= -abs(policy.min_effect) and agg["p_value"] <= policy.fdr_alpha:
             return EvidenceStatus.REJECTED
         return EvidenceStatus.INSUFFICIENT_EVIDENCE
 
-    @staticmethod
-    def _reason_for(status: EvidenceStatus, agg: dict, policy: SearchPolicy) -> str:
+    def _reason_for(self, status: EvidenceStatus, agg: dict, policy: SearchPolicy) -> str:
+        direction = 1 if (self._ctx and self._ctx.protocol.direction == "higher") else -1
         p = agg.get("p_value")
         p_s = f"{p:.4g}" if _finite(p) else "not estimable"
         lo, hi = agg.get("ci_low"), agg.get("ci_high")
         ci_s = (f"({lo:+.4f},{hi:+.4f})" if _finite(lo) and _finite(hi)
                 else "not estimable")
         if status == EvidenceStatus.VALIDATED:
-            return (f"effect {agg['effect']:+.4f} (CI {ci_s}), p={p_s}, "
-                    f"stability={agg['stability']:.2f} ≥ {policy.min_stability}, "
-                    f"coverage={agg['fold_coverage']:.2f}, "
-                    f"seeds={agg.get('n_seeds')} agreement={agg.get('seed_agreement'):.2f}")
+            msg = (f"effect {agg['effect']:+.4f} (CI {ci_s}), p={p_s}, "
+                   f"stability={agg['stability']:.2f} ≥ {policy.min_stability}, "
+                   f"coverage={agg['fold_coverage']:.2f}, "
+                   f"seeds={agg.get('n_seeds')} agreement={agg.get('seed_agreement'):.2f}")
+            if _finite(agg.get("control_effect")):
+                cv = agg.get("control_variant") or "control:ones"
+                msg += f", vs {cv}={agg['control_effect']:+.4f}"
+            return msg
         if status == EvidenceStatus.REJECTED:
             return f"significant negative effect {agg['effect']:+.4f}, p={p_s}"
-        return (f"inconclusive: effect {agg['effect']:+.4f}, p={p_s}, "
-                f"stability={agg['stability']:.2f}, coverage={agg.get('fold_coverage')}, "
-                f"seed_agreement={agg.get('seed_agreement')}, thresholds effect≥"
-                f"{policy.min_effect} & stability≥{policy.min_stability}")
+        extra_reasons: list[str] = []
+        if policy.require_positive_ci and _finite(lo) and _finite(hi):
+            if (direction > 0 and float(lo) <= 0.0) or (direction < 0 and float(hi) >= 0.0):
+                extra_reasons.append(f"paired CI {ci_s} crosses zero")
+        ctrl_variant = agg.get("control_variant") or (
+            self._ctx.protocol.control_variant if self._ctx else ""
+        )
+        if ctrl_variant and policy.require_beat_control and (
+            "control_effect" in agg or agg.get("control_variant")
+        ):
+            ctrl_eff_raw = agg.get("control_effect")
+            if not _finite(ctrl_eff_raw):
+                extra_reasons.append(f"fails to beat {ctrl_variant} (control_delta not estimable)")
+            else:
+                ctrl_impr = direction * float(ctrl_eff_raw)
+                min_delta = float(policy.min_control_delta)
+                ctrl_ok = (ctrl_impr > 0.0) if min_delta == 0.0 else (ctrl_impr >= min_delta)
+                if not ctrl_ok:
+                    extra_reasons.append(
+                        f"fails to beat {ctrl_variant} (control_delta={float(ctrl_eff_raw):+.4f}, "
+                        f"min_control_delta={min_delta})"
+                    )
+        base_msg = (
+            f"inconclusive: effect {agg['effect']:+.4f} (CI {ci_s}), p={p_s}, "
+            f"stability={agg['stability']:.2f}, coverage={agg.get('fold_coverage')}, "
+            f"seed_agreement={agg.get('seed_agreement')}, thresholds effect≥"
+            f"{policy.min_effect} & stability≥{policy.min_stability}"
+        )
+        if extra_reasons:
+            base_msg += "; " + "; ".join(extra_reasons)
+        return base_msg
 
     def _make_evidence(self, cand: dict, round_rec: RoundRecord, status: EvidenceStatus,
                        **kw) -> EvidenceRecord:
@@ -1483,6 +1872,44 @@ class PredicateLabEngine:
         print(f"[freeze] family {family_id[:16]} with {len(members)} candidate(s)")
         return manifest
 
+    def _compute_family_multiplicity(
+        self,
+        metrics_list: list[dict[str, Any]],
+        *,
+        nw_lag: int,
+        n_boot: int,
+        block: int,
+        seed: int,
+    ) -> tuple[float, list[float | None]]:
+        if not metrics_list:
+            return 0.0, []
+        valid_indices: list[int] = []
+        series_list: list[dict[str, float]] = []
+        for idx, m in enumerate(metrics_list):
+            ds = (m or {}).get("delta_series")
+            if isinstance(ds, dict) and len(ds) >= 2:
+                valid_indices.append(idx)
+                series_list.append({str(k): float(v) for k, v in ds.items() if _finite(v)})
+        out_rw: list[float | None] = [None] * len(metrics_list)
+        if not series_list:
+            return float(len(metrics_list)), out_rw
+        all_dates = sorted({d for s in series_list for d in s.keys()})
+        if len(all_dates) < 2:
+            return float(len(series_list)), out_rw
+        mat = np.full((len(all_dates), len(series_list)), np.nan, dtype=float)
+        for j, s in enumerate(series_list):
+            for i, d in enumerate(all_dates):
+                if d in s:
+                    mat[i, j] = s[d]
+        m_eff = effective_num_tests(mat)
+        rw_raw = romano_wolf_stepdown(
+            mat, n_boot=max(50, int(n_boot)), block=block, seed=seed, nw_lag=nw_lag
+        )
+        for j, orig_idx in enumerate(valid_indices):
+            val = rw_raw[j] if j < len(rw_raw) else float("nan")
+            out_rw[orig_idx] = float(val) if _finite(val) else None
+        return float(m_eff), out_rw
+
     def confirm(self, candidate_ids: list[str] | None = None,
                 top_k: int | None = None) -> dict[str, Any]:
         """Independent confirmation on later data; never feeds the generator."""
@@ -1492,13 +1919,26 @@ class PredicateLabEngine:
                 "protocol has no confirmation folds; declare disjoint later data or "
                 "explicitly run an exploratory final"
             )
+        latest_code = code_version(self._repo_root(), extra_roots=self._external_code_roots())
+        ctx.code = latest_code
+        run_row = self.store.get_run(self.run_id) or {}
+        if run_row.get("code_fingerprint") and latest_code.get("dirty_fingerprint") != run_row.get("code_fingerprint"):
+            raise ProtocolViolation(
+                f"run {self.run_id} code_fingerprint changed since run creation "
+                f"({run_row['code_fingerprint'][:16]} -> {latest_code.get('dirty_fingerprint', '')[:16]}); "
+                "refusing confirmation"
+            )
         frozen = self.store.get_frozen_family(self.run_id)
         if not frozen:
             frozen = self.freeze_family(candidate_ids, top_k)
-        if frozen["protocol_hash"] != ctx.protocol_hash \
-                or frozen["snapshot_hash"] != ctx.snapshot.manifest_hash \
-                or frozen["data_manifest_hash"] != ctx.data_manifest_hash:
-            raise ProtocolViolation("frozen family identity no longer matches the run's data")
+        frozen_code_fp = (frozen.get("code") or {}).get("dirty_fingerprint")
+        if (
+            frozen["protocol_hash"] != ctx.protocol_hash
+            or frozen["snapshot_hash"] != ctx.snapshot.manifest_hash
+            or frozen["data_manifest_hash"] != ctx.data_manifest_hash
+            or (frozen_code_fp and frozen_code_fp != latest_code.get("dirty_fingerprint"))
+        ):
+            raise ProtocolViolation("frozen family identity no longer matches the run's data or code_fingerprint")
         ctx.frozen_family = frozen
         ctx.guard = ctx.guard.unlock(frozen["manifest_hash"])
         confirmation_claims: list[dict[str, Any]] = []
@@ -1585,9 +2025,18 @@ class PredicateLabEngine:
             results.append(ev)
         qvals = benjamini_hochberg([e.p_value if e.p_value is not None else float("nan")
                                     for e in results])
+        conf_m_eff, conf_rw_pvals = self._compute_family_multiplicity(
+            [dict(e.metrics or {}) for e in results],
+            nw_lag=ctx.policy.nw_lag,
+            n_boot=min(500, ctx.policy.bootstrap_samples),
+            block=ctx.policy.bootstrap_block,
+            seed=ctx.policy.seed,
+        )
         direction = 1 if ctx.protocol.direction == "higher" else -1
-        for ev, q in zip(results, qvals):
+        for ev, q, rw_p in zip(results, qvals, conf_rw_pvals):
             ev.q_value = q if q is not None and math.isfinite(q) else None
+            ev.metrics["effective_num_tests"] = conf_m_eff
+            ev.metrics["rw_p_value"] = rw_p
             if ev.state in {CandidateState.INDEPENDENTLY_CONFIRMED,
                             CandidateState.RESAMPLING_CONFIRMED} and (
                 ev.q_value is None or ev.q_value > ctx.policy.fdr_alpha
@@ -1618,6 +2067,8 @@ class PredicateLabEngine:
             "family_id": frozen["family_id"],
             "manifest_hash": frozen["manifest_hash"],
             "stage": "confirmation",
+            "effective_num_tests": conf_m_eff,
+            "rw_p_values": {e.candidate_id: e.metrics.get("rw_p_value") for e in results},
             "confirmation_folds": [f.model_dump(mode="json") for f in ctx.effective_confirmation],
             "confirmation_reused": bool(prior_exposures),
             "prior_confirmation_exposures": [
@@ -1634,8 +2085,8 @@ class PredicateLabEngine:
             "results": [
                 {"candidate_id": e.candidate_id, "status": e.status.value,
                  "state": e.state.value, "effect": e.effect, "ci": [e.ci_low, e.ci_high],
-                 "p": e.p_value, "q": e.q_value, "n_folds": e.n_folds,
-                 "stability": e.stability, "reason": e.reason}
+                 "p": e.p_value, "q": e.q_value, "rw_p_value": e.metrics.get("rw_p_value"),
+                 "n_folds": e.n_folds, "stability": e.stability, "reason": e.reason}
                 for e in results
             ],
             "note": "confirmation evidence is not visible to the candidate generator",
@@ -1765,9 +2216,21 @@ class PredicateLabEngine:
             raise ProtocolViolation(
                 f"candidate {candidate_id} is not in the frozen family; refusing holdout access"
             )
-        if frozen["protocol_hash"] != ctx.protocol_hash \
-                or frozen["data_manifest_hash"] != ctx.data_manifest_hash:
-            raise ProtocolViolation("frozen family does not match the current snapshot/protocol")
+        latest_code = code_version(self._repo_root(), extra_roots=self._external_code_roots())
+        ctx.code = latest_code
+        if run.get("code_fingerprint") and latest_code.get("dirty_fingerprint") != run.get("code_fingerprint"):
+            raise ProtocolViolation(
+                f"run {self.run_id} code_fingerprint changed since run creation "
+                f"({run['code_fingerprint'][:16]} -> {latest_code.get('dirty_fingerprint', '')[:16]}); "
+                "refusing holdout access"
+            )
+        frozen_code_fp = (frozen.get("code") or {}).get("dirty_fingerprint")
+        if (
+            frozen["protocol_hash"] != ctx.protocol_hash
+            or frozen["data_manifest_hash"] != ctx.data_manifest_hash
+            or (frozen_code_fp and frozen_code_fp != latest_code.get("dirty_fingerprint"))
+        ):
+            raise ProtocolViolation("frozen family does not match the current snapshot/protocol/code_fingerprint")
         confirmation, confirmed = self._final_candidate_state(candidate_id)
         require_confirmation = bool(self.run_cfg.get("require_confirmation", True))
         if require_confirmation:
@@ -1954,13 +2417,15 @@ class PredicateLabEngine:
         direction = 1 if ctx.protocol.direction == "higher" else -1
         effect = direction * agg["effect"]
         p = agg.get("p_value")
+        classified = self._classify(agg, ctx.policy)
         if not _finite(p):
             state = CandidateState.INSUFFICIENT
-        elif effect >= ctx.policy.min_effect and p <= ctx.policy.fdr_alpha \
-                and agg["fold_coverage"] >= ctx.policy.min_fold_coverage:
+        elif classified == EvidenceStatus.VALIDATED:
             state = (CandidateState.EXPLORATORY_POSITIVE if manifest.get("exploratory")
                      else CandidateState.INDEPENDENTLY_CONFIRMED)
-        elif effect <= -ctx.policy.min_effect and p <= ctx.policy.fdr_alpha:
+        elif classified == EvidenceStatus.REJECTED or (
+            effect <= -ctx.policy.min_effect and p <= ctx.policy.fdr_alpha
+        ):
             state = CandidateState.REJECTED
         else:
             state = CandidateState.INSUFFICIENT
@@ -2187,6 +2652,31 @@ class PredicateLabEngine:
         manifest["bundle_hash"] = sha256_obj(manifest)
         atomic_write_text(out / "bundle_manifest.json", strict_json_dumps(manifest))
         return out
+
+    def publish_snapshot(self, out_dir: str | Path, *,
+                         include_models: bool = False,
+                         include_data: bool = False,
+                         include_trial_details: bool = False,
+                         config_path: str | Path | None = None,
+                         repo_root: str | Path | None = None) -> Path:
+        """Build a lightweight, portable snapshot of this run.
+
+        Only ``results``, ``logs``, ``figures`` and ``code`` are copied by
+        default; trained weights (``models``) and bulk arrays/databases
+        (``data``) require an explicit opt-in.  The raw run directory is never
+        modified.  See :mod:`predicatelab.core.artifacts`.
+        """
+        from predicatelab.core.artifacts import build_run_snapshot
+
+        return build_run_snapshot(
+            self.artifacts, out_dir,
+            include_models=include_models,
+            include_data=include_data,
+            include_trial_details=include_trial_details,
+            config=self.config,
+            config_path=config_path,
+            repo_root=repo_root if repo_root is not None else self._repo_root(),
+        )
 
 
 def finalize_run(config: dict[str, Any], run_id: str, candidate_id: str,

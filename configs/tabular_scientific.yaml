@@ -1,0 +1,74 @@
+# Standard configuration template for external scientific / panel tabular datasets
+# with strict time-forward or group-forward splitting:
+#   - First 60% time/group buckets -> Discovery Folds (disc_f0, disc_f1, disc_f2)
+#   - Middle 20% time/group buckets -> Confirmation Folds (conf_f0, conf_f1; confirmation_kind: time_forward)
+#   - Last 20% time/group buckets -> Unconsumed One-Time Holdout Fold (holdout_20pct)
+run:
+  name: tabular_scientific_time_forward
+  domain: tabular
+  artifacts_dir: artifacts_tabular_scientific
+  db: artifacts_tabular_scientific/predicatelab.sqlite
+  rounds: 2
+  require_confirmation: true
+
+seeds: [2025, 2026, 2027]
+
+task:
+  title: Time-forward predicate discovery and independent confirmation on external tabular panel
+  question: Do discovered non-linear / relational feature predicates improve out-of-sample predictive accuracy on chronologically later confirmation and holdout windows?
+  hypothesis: Genuine domain relationships generalize across time-ordered confirmation and holdout splits under strict CI and FDR gates.
+
+data:
+  dataset: scientific_panel
+  path: data/scientific_panel.csv
+  target_col: target
+  time_col: time_period
+  task_type: regression
+
+training:
+  seed: 2025
+  alpha: 1.0
+
+protocol:
+  cv_splits: 3
+  confirmation_splits: 2
+  confirmation_kind: time_forward
+
+evaluation:
+  name: tabular_regression
+  primary_metric: mse
+  direction: lower
+  secondary_metrics:
+    - r2
+    - mae
+  paired: true
+  multiple_testing: benjamini-hochberg
+  notes: expanding-window time-forward evaluation (60% discovery / 20% confirmation / 20% holdout)
+
+search:
+  generator: rule
+  save_predictions: true
+  generator_config:
+    mutation_top_k: 3
+  max_candidates_per_round: 8
+  screen_folds:
+    - disc_f0
+  validation_folds:
+    - disc_f1
+    - disc_f2
+  full_validation_top_k: 3
+  min_screen_effect: 0.0
+  fdr_alpha: 0.10
+  min_effect: 0.005
+  min_stability: 0.60
+  min_fold_coverage: 0.75
+  min_seed_agreement: 0.50
+  require_positive_ci: true
+  require_beat_control: false
+  bootstrap_samples: 1000
+  bootstrap_block: 2
+  nw_lag: 2
+  seed: 2025
+
+execution:
+  workers: 1

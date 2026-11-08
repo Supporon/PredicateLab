@@ -7,6 +7,10 @@ domain-neutral core and domain adapters.
   loss and 23 upstream predicates plus six temporal predicates.
 * **Tabular**: an independent scikit-learn adapter that validates the core
   engine without TSIL.
+* **Small sample**: a controlled synthetic domain (n = 24–256) with an explicit
+  latent truth, used to measure type-I error and power of the
+  discovery→confirmation→holdout gates; see
+  [the small-sample scenario](docs/small_sample_scenario.md).
 * **Mineral prospectivity / image classification**: descriptor and adapter
   contracts only; every execution path raises `DomainNotImplemented`.
 
@@ -82,6 +86,31 @@ adapter emits them), `checksums.sha256` and `bundle_manifest.json`.
 execution completed; the scientific state (`independently_confirmed`,
 `resampling_confirmed`, `insufficient`, `rejected`) is in the payload, and
 undefined statistics are `null` plus `null_paths`, never NaN.
+
+## Artifacts and lightweight snapshots
+
+Raw runs mix small reports with heavy arrays, databases and optional weights.
+To migrate or commit a run, build a categorised snapshot instead of copying
+`artifacts/`:
+
+```bash
+# key results + logs + figures + small analysis code, with a change record
+python scripts/package_snapshot.py --artifacts-root artifacts --out published
+
+# trained weights and prediction arrays too (local archive only)
+python scripts/package_snapshot.py --include-models --include-data \
+    --out snapshots/full --archive snapshots/full.tar.gz
+```
+
+The snapshot separates `results/`, `logs/`, `figures/`, `code/`, `models/`
+and `data/`, and writes `MANIFEST.json`, `checksums.sha256`, a README per
+experiment and `changes/` (git status/diff/log, redacted config, environment).
+`models/` and `data/` are excluded unless explicitly requested, which is what
+keeps the committed tree small.  Per-trial `result.json`/`job.json` are
+compacted into `results/trials_summary.csv`; pass `--include-trial-details`
+to copy them individually.  Result figures are produced by
+`scripts/plot_run_results.py --run-dir <run>` into the run's `figures/`.
+Full details: [docs/artifact_layout.md](docs/artifact_layout.md).
 
 ## Documentation
 

@@ -20,7 +20,7 @@ def _cfg(domain):
 
 
 def test_registry_separates_executable_and_reserved_domains():
-    assert set(executable_domains()) == {"tsil", "tabular"}
+    assert set(executable_domains()) == {"tsil", "tabular", "small_sample"}
     assert set(reserved_domains()) == {"mineral", "image"}
 
 

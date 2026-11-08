@@ -1,0 +1,10 @@
+{
+  "has_timestamp": true,
+  "path": "artifacts/tsil_tau_learned/_probe_batches/4b8a673e5adb0ec3c40d8fac/f2022.npz",
+  "shape": [
+    64,
+    20,
+    158
+  ],
+  "status": "success"
+}

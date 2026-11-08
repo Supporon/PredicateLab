@@ -1,0 +1,746 @@
+{
+  "proposals": [
+    {
+      "kind": "statistical",
+      "name": "LLM-Sym: Multi-Horizon Path Efficiency & Semivariance Asymmetry",
+      "rationale": "Aligns assets sharing both directional path efficiency (Kaufman ratio on rolling price factors) and upside/downside semivariance asymmetry across short and full windows.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 10
+        },
+        "channels": [
+          {
+            "time_op": "path_efficiency",
+            "feature_op": "mean",
+            "window": 5,
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "time_op": "path_efficiency",
+            "feature_op": "std",
+            "window": 20,
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "time_op": "semivar_asymmetry",
+            "feature_op": "mean",
+            "window": 10,
+            "feature_slice": [
+              9,
+              29
+            ]
+          },
+          {
+            "time_op": "semivar_asymmetry",
+            "feature_op": "iqr",
+            "window": 20,
+            "feature_slice": [
+              95,
+              158
+            ]
+          },
+          {
+            "time_op": "accel",
+            "feature_op": "mean",
+            "window": 15,
+            "feature_slice": [
+              29,
+              95
+            ]
+          }
+        ]
+      },
+      "round": 0
+    },
+    {
+      "kind": "composite",
+      "name": "LLM-Comp: Concat(SemivarRatio w10, VolPriceCorr w10, PathEfficiency w10)",
+      "rationale": "Joint feature-space concatenation of downside semivariance asymmetry, volume-price synergy, and Kaufman path efficiency to form a high-rank orthogonal similarity kernel.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "semivar_ratio",
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "vol_price_corr",
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "path_efficiency",
+            "params": {
+              "window": 10
+            }
+          }
+        ],
+        "weights": [
+          1.2,
+          1.0,
+          1.0
+        ]
+      },
+      "round": 0
+    },
+    {
+      "kind": "relational",
+      "name": "LLM-Sym: Price-Volume Lead-Lag Beta & Order-Flow Divergence",
+      "rationale": "Captures cross-channel lead-lag predictive beta and lag-1 correlation between volume/order-flow features [95:158] and rolling price momentum [29:95].",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 15
+        },
+        "channels": [
+          {
+            "time_op": "mean",
+            "feature_op": "mean",
+            "window": 10,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "interaction": "lead_lag_corr"
+          },
+          {
+            "time_op": "mean",
+            "feature_op": "mean",
+            "window": 20,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "interaction": "beta"
+          },
+          {
+            "time_op": "slope",
+            "feature_op": "mean",
+            "window": 10,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "rhs_time_op": "slope",
+            "interaction": "diff"
+          },
+          {
+            "time_op": "ema_diff",
+            "feature_op": "top_bottom_spread",
+            "window": 15,
+            "feature_slice": [
+              95,
+              158
+            ]
+          }
+        ]
+      },
+      "round": 0
+    },
+    {
+      "kind": "composite",
+      "name": "LLM-Comp: Concat(HurstVR w15, LeadLagBeta w12, RegimeTransition w16)",
+      "rationale": "Combines multi-horizon variance ratio scaling, volume-price lead-lag beta, and regime transition shifts in a unified standardized embedding.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "hurst_vr",
+            "params": {
+              "window": 15
+            }
+          },
+          {
+            "family": "lead_lag_beta",
+            "params": {
+              "window": 12
+            }
+          },
+          {
+            "family": "regime_transition",
+            "params": {
+              "window": 16
+            }
+          }
+        ],
+        "weights": [
+          1.0,
+          1.2,
+          1.0
+        ]
+      },
+      "round": 0
+    },
+    {
+      "kind": "statistical",
+      "name": "LLM-Sym: Hurst Variance-Ratio Scaling & Drawdown Resilience",
+      "rationale": "Distinguishes trend-persistent assets (Hurst VR > 1) from mean-reverting assets (VR < 1) jointly with normalized maximum drawdown and quantile spread.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 20
+        },
+        "channels": [
+          {
+            "time_op": "hurst_proxy",
+            "feature_op": "mean",
+            "window": 10,
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "time_op": "hurst_proxy",
+            "feature_op": "iqr",
+            "window": 20,
+            "feature_slice": [
+              9,
+              29
+            ]
+          },
+          {
+            "time_op": "max_drawdown",
+            "feature_op": "mean",
+            "window": 20,
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "time_op": "q_spread",
+            "feature_op": "mean",
+            "window": 10,
+            "feature_slice": [
+              95,
+              158
+            ]
+          },
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "mean",
+            "window": 15,
+            "feature_slice": [
+              29,
+              95
+            ]
+          }
+        ]
+      },
+      "round": 0
+    },
+    {
+      "kind": "composite",
+      "name": "LLM-Comp: Subspace Concat(Price Momentum w5, Rolling Volatility w10, Volume Dispersion w15)",
+      "rationale": "Decomposes Alpha158 into price [9:29], rolling [29:95], and volume [95:158] subspaces at fast, medium, and slow horizons.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "momentum",
+            "params": {
+              "window": 5
+            },
+            "feature_slice": [
+              9,
+              29
+            ]
+          },
+          {
+            "family": "volatility",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "dispersion",
+            "params": {
+              "window": 15
+            },
+            "feature_slice": [
+              95,
+              158
+            ]
+          }
+        ],
+        "weights": [
+          1.5,
+          1.0,
+          1.0
+        ]
+      },
+      "round": 0
+    },
+    {
+      "kind": "statistical",
+      "name": "LLM-Sym: KBar Intraday Morphology & Tail Skew-Kurtosis Coupling",
+      "rationale": "Combines candlestick shadow/body morphology [0:9] with higher-moment tail skewness, kurtosis, and top-bottom feature spread over rolling windows.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 15
+        },
+        "channels": [
+          {
+            "time_op": "ema_diff",
+            "feature_op": "mean",
+            "window": 5,
+            "feature_slice": [
+              0,
+              9
+            ]
+          },
+          {
+            "time_op": "std",
+            "feature_op": "top_bottom_spread",
+            "window": 10,
+            "feature_slice": [
+              0,
+              9
+            ]
+          },
+          {
+            "time_op": "skew",
+            "feature_op": "mean",
+            "window": 15,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "transform": "tanh"
+          },
+          {
+            "time_op": "kurt",
+            "feature_op": "mean",
+            "window": 20,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "transform": "sign_sqrt"
+          },
+          {
+            "time_op": "semivar_asymmetry",
+            "feature_op": "mean",
+            "window": 15,
+            "feature_slice": [
+              0,
+              9
+            ]
+          }
+        ]
+      },
+      "round": 0
+    },
+    {
+      "kind": "composite",
+      "name": "LLM-Comp: Kernel Mix(SemivarRatio w10, Multi-Scale Volatility w5, LeadLagBeta w12)",
+      "rationale": "Trace-normalized kernel convex combination mixing multi-scale volatility with asymmetric semivariance and lead-lag beta kernels.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "semivar_ratio",
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "volatility",
+            "params": {
+              "window": 5
+            }
+          },
+          {
+            "family": "lead_lag_beta",
+            "params": {
+              "window": 12
+            }
+          },
+          {
+            "family": "dispersion",
+            "params": {
+              "window": 20
+            }
+          }
+        ],
+        "weights": [
+          1.5,
+          1.0,
+          1.2,
+          0.8
+        ]
+      },
+      "round": 0
+    },
+    {
+      "kind": "relational",
+      "name": "LLM-Sym: Cross-Horizon Volatility Regime Transition & Acceleration",
+      "rationale": "Measures regime transitions via the ratio of short-window to full-window volatility, second-order trend acceleration, and price-volume correlation.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 20
+        },
+        "channels": [
+          {
+            "time_op": "std",
+            "feature_op": "mean",
+            "window": 5,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "std",
+            "rhs_window": 20,
+            "interaction": "ratio"
+          },
+          {
+            "time_op": "accel",
+            "feature_op": "mean",
+            "window": 20,
+            "feature_slice": [
+              9,
+              29
+            ]
+          },
+          {
+            "time_op": "accel",
+            "feature_op": "iqr",
+            "window": 15,
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "time_op": "mean",
+            "feature_op": "mean",
+            "window": 10,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "interaction": "corr"
+          }
+        ]
+      },
+      "round": 0
+    },
+    {
+      "kind": "composite",
+      "name": "LLM-Comp: Concat(TailAsymmetry w15, Drawdown w20, Trend w10, Autocorr w15)",
+      "rationale": "4-part risk-and-trend composite pairing tail expected shortfall and max drawdown with linear trend fit and return autocorrelation.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "tail_asymmetry",
+            "params": {
+              "window": 15
+            }
+          },
+          {
+            "family": "drawdown",
+            "params": {
+              "window": 20
+            }
+          },
+          {
+            "family": "trend",
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "autocorr",
+            "params": {
+              "window": 15
+            }
+          }
+        ],
+        "weights": [
+          1.2,
+          1.0,
+          1.2,
+          0.8
+        ]
+      },
+      "round": 0
+    },
+    {
+      "kind": "soft",
+      "name": "LLM-Op: Kaufman Path Efficiency & Persistence (window 12)",
+      "rationale": "Signal-to-noise directional efficiency ratio, step sign persistence, and path curvature.",
+      "descriptor": {
+        "family": "path_efficiency",
+        "params": {
+          "window": 12
+        }
+      },
+      "round": 0
+    },
+    {
+      "kind": "composite",
+      "name": "LLM-Comp: Multi-Horizon Momentum+PathEfficiency+RegimeTransition Concat",
+      "rationale": "Captures fast momentum (w=5), medium path efficiency (w=10), and slow regime shift (w=20) to separate genuine trend continuation from high-volatility reversals.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "momentum",
+            "params": {
+              "window": 5
+            }
+          },
+          {
+            "family": "path_efficiency",
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "regime_transition",
+            "params": {
+              "window": 20
+            }
+          }
+        ],
+        "weights": [
+          1.0,
+          1.3,
+          1.0
+        ]
+      },
+      "round": 0
+    },
+    {
+      "kind": "statistical",
+      "name": "LLM-Op: Multi-Horizon Hurst Variance Ratio (window 16)",
+      "rationale": "Lag-2 and lag-3 variance ratios capturing persistent trend vs mean reversion.",
+      "descriptor": {
+        "family": "hurst_vr",
+        "params": {
+          "window": 16
+        }
+      },
+      "round": 0
+    },
+    {
+      "kind": "composite",
+      "name": "LLM-Comp: Hybrid Mix(Symbolic Path+Semivar, VolPriceCorr w15, HurstVR w15)",
+      "rationale": "Combines an LLM symbolic multi-channel descriptor with volume-price correlation and Hurst variance ratio via kernel-level P-mixing.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "symbolic",
+            "params": {
+              "window": 10
+            },
+            "channels": [
+              {
+                "time_op": "path_efficiency",
+                "feature_op": "mean",
+                "window": 10,
+                "feature_slice": [
+                  29,
+                  95
+                ]
+              },
+              {
+                "time_op": "semivar_asymmetry",
+                "feature_op": "mean",
+                "window": 15,
+                "feature_slice": [
+                  9,
+                  29
+                ]
+              },
+              {
+                "time_op": "q_spread",
+                "feature_op": "iqr",
+                "window": 20,
+                "feature_slice": [
+                  95,
+                  158
+                ]
+              }
+            ]
+          },
+          {
+            "family": "vol_price_corr",
+            "params": {
+              "window": 15
+            }
+          },
+          {
+            "family": "hurst_vr",
+            "params": {
+              "window": 15
+            }
+          }
+        ],
+        "weights": [
+          1.5,
+          1.0,
+          1.0
+        ]
+      },
+      "round": 0
+    },
+    {
+      "kind": "relational",
+      "name": "LLM-Op: Price-Volume Lead-Lag Predictive Beta (window 12)",
+      "rationale": "Asymmetric lag-1 cross-correlation and predictive regression beta between volume and price.",
+      "descriptor": {
+        "family": "lead_lag_beta",
+        "params": {
+          "window": 12
+        }
+      },
+      "round": 0
+    },
+    {
+      "kind": "composite",
+      "name": "LLM-Comp: Subspace Mix(KBar Volatility, Rolling SemivarRatio, Volume LeadLagBeta)",
+      "rationale": "Blends subspace-specific similarity kernels from KBar candlestick volatility, rolling downside semivariance, and volume-price lead-lag beta.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "volatility",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              0,
+              9
+            ]
+          },
+          {
+            "family": "semivar_ratio",
+            "params": {
+              "window": 15
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "lead_lag_beta",
+            "params": {
+              "window": 15
+            },
+            "feature_slice": [
+              95,
+              158
+            ]
+          }
+        ],
+        "weights": [
+          0.8,
+          1.4,
+          1.2
+        ]
+      },
+      "round": 0
+    },
+    {
+      "kind": "statistical",
+      "name": "LLM-Op: Short-vs-Prior Regime Transition (window 16)",
+      "rationale": "Log-volatility shift, drift shift, and cross-sectional dispersion shift across half-windows.",
+      "descriptor": {
+        "family": "regime_transition",
+        "params": {
+          "window": 16
+        }
+      },
+      "round": 0
+    },
+    {
+      "kind": "statistical",
+      "name": "LLM-Op: Expected Shortfall & Tail Excursion Asymmetry (window 15)",
+      "rationale": "Upper vs lower tail expected shortfall and extreme gain/loss asymmetry across features.",
+      "descriptor": {
+        "family": "tail_asymmetry",
+        "params": {
+          "window": 15
+        }
+      },
+      "round": 0
+    },
+    {
+      "kind": "statistical",
+      "name": "LLM-Op: Upside/Downside Semivariance Asymmetry (window 12, Rolling Features)",
+      "rationale": "Downside vs upside semivariance share isolated on rolling return/volatility features [29:95].",
+      "descriptor": {
+        "family": "semivar_ratio",
+        "params": {
+          "window": 12
+        },
+        "feature_slice": [
+          29,
+          95
+        ]
+      },
+      "round": 0
+    },
+    {
+      "kind": "relational",
+      "name": "LLM-Op: Volume-Price Synergy (window 15)",
+      "rationale": "Multi-scale synchronous and lag-1 correlation between price and volume channels.",
+      "descriptor": {
+        "family": "vol_price_corr",
+        "params": {
+          "window": 15
+        }
+      },
+      "round": 0
+    }
+  ]
+}

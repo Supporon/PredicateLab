@@ -1,0 +1,1599 @@
+{
+  "ok": true,
+  "model": "deepseek-flash",
+  "latency_s": 37.038,
+  "usage": {
+    "prompt_tokens": 3700,
+    "completion_tokens": 8210,
+    "total_tokens": 11910,
+    "prompt_tokens_details": {
+      "cached_tokens": 1152
+    },
+    "prompt_cache_hit_tokens": 1152,
+    "prompt_cache_miss_tokens": 2548
+  },
+  "error": "",
+  "analysis": "Previous round shows a clear pattern: operators on the [95,158] volume/order-flow and [29,95] momentum/volatility subspaces with moderate windows (10-15) produced the highest screen effects (lead_lag_beta 0.0041, path_efficiency 0.0039, vol_price_corr 0.0051), while short-window KBar [0,9] and very short windows (5-8) generally underperformed or failed validation (negative full effect). The best screen_effect came from vol_price_corr[95,158] w12 (0.0051) and lead_lag_beta[95,158] w10 (0.0041), yet their full-validation effect was negative — suggesting these single-operator kernels are too low-rank/too aligned and overfit the screen fold. Strategy for round 1: (a) evolve the top screen performers by combining them with complementary [29,95] and [9,29] channels to raise effective rank and decorrelate from 11^T/B; (b) build 3-5 channel symbolic predicates that mix volume/order-flow time-ops (std, autocorr_1, hurst_proxy, path_efficiency) with momentum slope/ema_diff and cross-interactions (corr, ratio, lead_lag) to enrich rank; (c) avoid tiny windows (>=8) and avoid pure [0,9] KBar-only descriptors; (d) include a few composite mix/concat blends of the strongest single operators (vol_price_corr, lead_lag_beta, path_efficiency) with orthogonal [29,95] operators to hedge the negative full-validation effect. All proposals use >=3 diverse weakly correlated channels or >=2 mixed parts to satisfy the rank gate.",
+  "reasoning_content": "",
+  "n_proposals": 27,
+  "proposals": [
+    {
+      "kind": "statistical",
+      "name": "VolFlowMomentumRankMix",
+      "rationale": "Combine volume-price correlation (screen winner 0.0051) with momentum slope and path efficiency to add orthogonal rank dimensions and reduce collapse toward the global shrinkage kernel.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 12
+        },
+        "channels": [
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "mean",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "corr",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "slope",
+            "rhs_window": 12,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "path_efficiency",
+            "feature_op": "l2_norm",
+            "window": 14,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "std",
+            "feature_op": "top_bottom_spread",
+            "window": 10,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "ratio",
+            "rhs_slice": [
+              9,
+              29
+            ],
+            "rhs_time_op": "mean",
+            "rhs_window": 10,
+            "transform": "abs",
+            "weight": 0.9
+          },
+          {
+            "time_op": "ema_diff",
+            "feature_op": "mean",
+            "window": 10,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "sign_sqrt",
+            "weight": 0.8
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "LeadLagBetaVolHurst",
+      "rationale": "Evolve lead_lag_beta[95,158] winner by adding hurst_proxy on [29,95] and semivar asymmetry to diversify rank while preserving order-flow lead-lag beta signal.",
+      "parents": [
+        "cand_85651dad6f5c554e"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 10
+        },
+        "channels": [
+          {
+            "time_op": "hurst_proxy",
+            "feature_op": "mean",
+            "window": 16,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "beta",
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "rhs_time_op": "ema_diff",
+            "rhs_window": 10,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "semivar_asymmetry",
+            "feature_op": "std",
+            "window": 12,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "l2_norm",
+            "window": 10,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "PathEffVolPriceLeadLag",
+      "rationale": "Blend path_efficiency[9,29] with vol_price_corr[95,158] and a lead_lag_corr cross-channel to decorrelate from ones-kernel and lift effective rank.",
+      "parents": [
+        "cand_9f6a64bf06f399aa",
+        "cand_0b36af32ef866568"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 14
+        },
+        "channels": [
+          {
+            "time_op": "path_efficiency",
+            "feature_op": "mean",
+            "window": 14,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.1
+          },
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "std",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "lead_lag_corr",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "slope",
+            "rhs_window": 12,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "q_spread",
+            "feature_op": "iqr",
+            "window": 10,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.8
+          },
+          {
+            "time_op": "ema_diff",
+            "feature_op": "mean",
+            "window": 8,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "sign_sqrt",
+            "weight": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "OrderFlowMomentumHurstTriple",
+      "rationale": "Triple of order-flow autocorr, momentum hurst, and vol-price ratio across three distinct subspaces to maximize effective rank and hedge single-operator overfit.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 13
+        },
+        "channels": [
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "mean",
+            "window": 13,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "ratio",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "std",
+            "rhs_window": 13,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "hurst_proxy",
+            "feature_op": "l2_norm",
+            "window": 15,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "semivar_asymmetry",
+            "feature_op": "std",
+            "window": 11,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          },
+          {
+            "time_op": "slope",
+            "feature_op": "mean",
+            "window": 9,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "sign_sqrt",
+            "weight": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "VolPriceBetaMomentumSlope",
+      "rationale": "Use beta interaction between volume std and momentum slope plus a path-efficiency channel to capture cross-sectional dispersion in flow-adjusted momentum.",
+      "parents": [
+        "cand_0b36af32ef866568"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 12
+        },
+        "channels": [
+          {
+            "time_op": "std",
+            "feature_op": "mean",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "beta",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "slope",
+            "rhs_window": 12,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "path_efficiency",
+            "feature_op": "l2_norm",
+            "window": 16,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "top_bottom_spread",
+            "window": 10,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          },
+          {
+            "time_op": "ema_diff",
+            "feature_op": "mean",
+            "window": 9,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "sign_sqrt",
+            "weight": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "RegimeFlowAsymMomentum",
+      "rationale": "Capture regime transitions via semivar asymmetry on volume plus momentum hurst and vol-price lead-lag to span multiple weakly correlated rank directions.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 12
+        },
+        "channels": [
+          {
+            "time_op": "semivar_asymmetry",
+            "feature_op": "mean",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "tanh",
+            "weight": 1.1
+          },
+          {
+            "time_op": "hurst_proxy",
+            "feature_op": "std",
+            "window": 16,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "mean",
+            "window": 11,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "lead_lag_corr",
+            "rhs_slice": [
+              9,
+              29
+            ],
+            "rhs_time_op": "slope",
+            "rhs_window": 10,
+            "transform": "abs",
+            "weight": 0.9
+          },
+          {
+            "time_op": "path_efficiency",
+            "feature_op": "l2_norm",
+            "window": 14,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "sign_sqrt",
+            "weight": 0.8
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "FlowVolRatioTrendQspread",
+      "rationale": "Ratio interaction of volume std to momentum mean plus trend-slope and iqr channels to enrich rank while keeping order-flow dominance.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 12
+        },
+        "channels": [
+          {
+            "time_op": "std",
+            "feature_op": "l2_norm",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "ratio",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "mean",
+            "rhs_window": 12,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "slope",
+            "feature_op": "mean",
+            "window": 15,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "q_spread",
+            "feature_op": "iqr",
+            "window": 11,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          },
+          {
+            "time_op": "ema_diff",
+            "feature_op": "mean",
+            "window": 9,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "sign_sqrt",
+            "weight": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "MomentumFlowCorrHalfTriple",
+      "rationale": "Use corr_half on momentum paired with flow autocorr and a hurst channel to capture half-window stability of flow-momentum coupling.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 12
+        },
+        "channels": [
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "corr_half",
+            "window": 12,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "corr",
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "rhs_time_op": "std",
+            "rhs_window": 12,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "hurst_proxy",
+            "feature_op": "mean",
+            "window": 16,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "path_efficiency",
+            "feature_op": "l2_norm",
+            "window": 13,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "VolPriceCorrBetaPathEff",
+      "rationale": "Evolve vol_price_corr winner by adding a beta interaction and path efficiency to raise effective rank and cross-sectional spread.",
+      "parents": [
+        "cand_0b36af32ef866568"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 12
+        },
+        "channels": [
+          {
+            "time_op": "std",
+            "feature_op": "mean",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "corr",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "slope",
+            "rhs_window": 12,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "path_efficiency",
+            "feature_op": "l2_norm",
+            "window": 15,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "top_bottom_spread",
+            "window": 11,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          },
+          {
+            "time_op": "ema_diff",
+            "feature_op": "mean",
+            "window": 8,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "sign_sqrt",
+            "weight": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "FlowLeadLagMomentumHurst",
+      "rationale": "Lead-lag correlation between flow and momentum with hurst proxy on flow to isolate persistent order-flow regimes.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 11
+        },
+        "channels": [
+          {
+            "time_op": "std",
+            "feature_op": "mean",
+            "window": 11,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "lead_lag_corr",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "slope",
+            "rhs_window": 11,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "hurst_proxy",
+            "feature_op": "l2_norm",
+            "window": 15,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "semivar_asymmetry",
+            "feature_op": "std",
+            "window": 12,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "MomentumTrendFlowRatio",
+      "rationale": "Ratio of momentum trend slope to flow volatility plus a q_spread and ema_diff channel to span rank across momentum and volume subspaces.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 13
+        },
+        "channels": [
+          {
+            "time_op": "slope",
+            "feature_op": "mean",
+            "window": 13,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "ratio",
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "rhs_time_op": "std",
+            "rhs_window": 13,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "q_spread",
+            "feature_op": "iqr",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "path_efficiency",
+            "feature_op": "l2_norm",
+            "window": 14,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          },
+          {
+            "time_op": "ema_diff",
+            "feature_op": "mean",
+            "window": 9,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "sign_sqrt",
+            "weight": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "VolHurstMomentumBetaFlow",
+      "rationale": "Beta of volume hurst on momentum slope plus a flow autocorr channel to capture persistent-flow-adjusted momentum ranking.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 12
+        },
+        "channels": [
+          {
+            "time_op": "hurst_proxy",
+            "feature_op": "mean",
+            "window": 14,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "beta",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "slope",
+            "rhs_window": 12,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "std",
+            "window": 11,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "path_efficiency",
+            "feature_op": "l2_norm",
+            "window": 15,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          },
+          {
+            "time_op": "ema_diff",
+            "feature_op": "mean",
+            "window": 8,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "sign_sqrt",
+            "weight": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "OrderFlowAsymMomentumCorr",
+      "rationale": "Semivar asymmetry on flow with a momentum-flow corr channel and hurst proxy to diversify rank and reduce ones-alignment.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 12
+        },
+        "channels": [
+          {
+            "time_op": "semivar_asymmetry",
+            "feature_op": "mean",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "corr",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "slope",
+            "rhs_window": 12,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "hurst_proxy",
+            "feature_op": "l2_norm",
+            "window": 15,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "top_bottom_spread",
+            "window": 11,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "PathEffFlowBetaHurst",
+      "rationale": "Evolve path_efficiency[9,29] winner by pairing with flow beta and hurst proxy on [29,95] to raise rank while keeping path-efficiency signal.",
+      "parents": [
+        "cand_9f6a64bf06f399aa"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 14
+        },
+        "channels": [
+          {
+            "time_op": "path_efficiency",
+            "feature_op": "mean",
+            "window": 14,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.1
+          },
+          {
+            "time_op": "std",
+            "feature_op": "l2_norm",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "beta",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "slope",
+            "rhs_window": 12,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "hurst_proxy",
+            "feature_op": "mean",
+            "window": 16,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          },
+          {
+            "time_op": "ema_diff",
+            "feature_op": "mean",
+            "window": 9,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "sign_sqrt",
+            "weight": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "FlowVolMomentumQspreadTriple",
+      "rationale": "Combine flow std-to-momentum ratio, q_spread flow dispersion, and momentum slope to span three weakly correlated rank directions.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 12
+        },
+        "channels": [
+          {
+            "time_op": "std",
+            "feature_op": "top_bottom_spread",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "ratio",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "mean",
+            "rhs_window": 12,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "q_spread",
+            "feature_op": "iqr",
+            "window": 11,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "slope",
+            "feature_op": "mean",
+            "window": 14,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "MomentumHurstFlowLeadLagBeta",
+      "rationale": "Momentum hurst with flow lead-lag correlation and beta to capture cross-sectional persistence of flow-momentum coupling.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 12
+        },
+        "channels": [
+          {
+            "time_op": "hurst_proxy",
+            "feature_op": "mean",
+            "window": 16,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.1
+          },
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "std",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "lead_lag_corr",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "slope",
+            "rhs_window": 12,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "path_efficiency",
+            "feature_op": "l2_norm",
+            "window": 14,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "beta",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "mean",
+            "rhs_window": 12,
+            "transform": "abs",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "VolPriceCorrHurstSemivarMix",
+      "rationale": "Mix vol-price corr with hurst proxy and semivar asymmetry across flow and momentum to maximize rank while hedging single-operator sign instability.",
+      "parents": [
+        "cand_0b36af32ef866568"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 12
+        },
+        "channels": [
+          {
+            "time_op": "std",
+            "feature_op": "mean",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "corr",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "slope",
+            "rhs_window": 12,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "hurst_proxy",
+            "feature_op": "l2_norm",
+            "window": 15,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "semivar_asymmetry",
+            "feature_op": "std",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          },
+          {
+            "time_op": "ema_diff",
+            "feature_op": "mean",
+            "window": 9,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "sign_sqrt",
+            "weight": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "FlowMomentumRatioHurstQspread",
+      "rationale": "Ratio of flow std to momentum slope combined with hurst and q_spread to span order-flow and momentum rank directions.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 13
+        },
+        "channels": [
+          {
+            "time_op": "std",
+            "feature_op": "l2_norm",
+            "window": 13,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "ratio",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "slope",
+            "rhs_window": 13,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "hurst_proxy",
+            "feature_op": "mean",
+            "window": 16,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "q_spread",
+            "feature_op": "iqr",
+            "window": 11,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "PathEffFlowMomentumBeta",
+      "rationale": "Path efficiency on momentum with flow beta and autocorr channels to capture flow-adjusted momentum path quality.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 14
+        },
+        "channels": [
+          {
+            "time_op": "path_efficiency",
+            "feature_op": "l2_norm",
+            "window": 14,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.1
+          },
+          {
+            "time_op": "std",
+            "feature_op": "mean",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "beta",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "slope",
+            "rhs_window": 12,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "top_bottom_spread",
+            "window": 11,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          },
+          {
+            "time_op": "ema_diff",
+            "feature_op": "mean",
+            "window": 9,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "sign_sqrt",
+            "weight": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "SemivarFlowMomentumHurstLeadLag",
+      "rationale": "Semivar flow asymmetry with momentum hurst and lead-lag corr to capture regime-conditional flow-momentum alignment.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 12
+        },
+        "channels": [
+          {
+            "time_op": "semivar_asymmetry",
+            "feature_op": "mean",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "tanh",
+            "weight": 1.1
+          },
+          {
+            "time_op": "hurst_proxy",
+            "feature_op": "l2_norm",
+            "window": 16,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "std",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "lead_lag_corr",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "slope",
+            "rhs_window": 11,
+            "transform": "abs",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "MomentumFlowCorrQspread",
+      "rationale": "Correlation interaction of momentum mean with flow std plus q_spread and path efficiency to diversify rank.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 12
+        },
+        "channels": [
+          {
+            "time_op": "mean",
+            "feature_op": "mean",
+            "window": 12,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "corr",
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "rhs_time_op": "std",
+            "rhs_window": 12,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "q_spread",
+            "feature_op": "iqr",
+            "window": 11,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "path_efficiency",
+            "feature_op": "l2_norm",
+            "window": 14,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          },
+          {
+            "time_op": "ema_diff",
+            "feature_op": "mean",
+            "window": 9,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "sign_sqrt",
+            "weight": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "kind": "relational",
+      "name": "VolPriceCorrOperator",
+      "rationale": "Refine vol_price_corr operator with a mid window (12) on the volume subspace, the strongest screen performer, to test full-validation stability at slightly different scale.",
+      "parents": [
+        "cand_0b36af32ef866568"
+      ],
+      "descriptor": {
+        "family": "vol_price_corr",
+        "feature_slice": [
+          95,
+          158
+        ],
+        "params": {
+          "window": 13
+        }
+      }
+    },
+    {
+      "kind": "relational",
+      "name": "LeadLagBetaOperator",
+      "rationale": "Refine lead_lag_beta operator with window 11 on volume subspace to test whether slightly longer lookback improves full-validation effect.",
+      "parents": [
+        "cand_85651dad6f5c554e"
+      ],
+      "descriptor": {
+        "family": "lead_lag_beta",
+        "feature_slice": [
+          95,
+          158
+        ],
+        "params": {
+          "window": 11
+        }
+      }
+    },
+    {
+      "kind": "relational",
+      "name": "PathEfficiencyOperator",
+      "rationale": "Refine path_efficiency operator on momentum subspace with window 13 to test mid-window stability of the screen winner.",
+      "parents": [
+        "cand_9f6a64bf06f399aa"
+      ],
+      "descriptor": {
+        "family": "path_efficiency",
+        "feature_slice": [
+          29,
+          95
+        ],
+        "params": {
+          "window": 13
+        }
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "FlowMomentumCompositeMix",
+      "rationale": "Convex mix of vol_price_corr, lead_lag_beta, and path_efficiency kernels to hedge single-operator negative full-validation effect and raise effective rank.",
+      "parents": [
+        "cand_0b36af32ef866568",
+        "cand_85651dad6f5c554e",
+        "cand_9f6a64bf06f399aa"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "vol_price_corr",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 12
+            }
+          },
+          {
+            "family": "lead_lag_beta",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "path_efficiency",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 14
+            }
+          }
+        ],
+        "weights": [
+          1.2,
+          1.0,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "FlowMomentumHurstCompositeConcat",
+      "rationale": "Concat of vol_price_corr and hurst_vr operators to span order-flow correlation and momentum persistence rank directions.",
+      "parents": [
+        "cand_0b36af32ef866568",
+        "cand_bb5a4c068b5f1631"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "vol_price_corr",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 12
+            }
+          },
+          {
+            "family": "hurst_vr",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 16
+            }
+          },
+          {
+            "family": "semivar_ratio",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 12
+            }
+          }
+        ],
+        "weights": [
+          1.2,
+          1.0,
+          0.8
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "SymbolicFlowMomentumComposite",
+      "rationale": "Mix a 4-channel symbolic flow-momentum predicate with a path_efficiency operator to combine rank-rich symbolic structure with a stable single operator.",
+      "parents": [
+        "cand_9f6a64bf06f399aa"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "symbolic",
+            "params": {
+              "window": 12
+            },
+            "channels": [
+              {
+                "time_op": "autocorr_1",
+                "feature_op": "mean",
+                "window": 12,
+                "feature_slice": [
+                  95,
+                  158
+                ],
+                "interaction": "corr",
+                "rhs_slice": [
+                  29,
+                  95
+                ],
+                "rhs_time_op": "slope",
+                "rhs_window": 12,
+                "transform": "tanh",
+                "weight": 1.2
+              },
+              {
+                "time_op": "hurst_proxy",
+                "feature_op": "l2_norm",
+                "window": 15,
+                "feature_slice": [
+                  29,
+                  95
+                ],
+                "interaction": "none",
+                "transform": "identity",
+                "weight": 1.0
+              },
+              {
+                "time_op": "semivar_asymmetry",
+                "feature_op": "std",
+                "window": 12,
+                "feature_slice": [
+                  95,
+                  158
+                ],
+                "interaction": "none",
+                "transform": "abs",
+                "weight": 0.9
+              }
+            ]
+          },
+          {
+            "family": "path_efficiency",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 14
+            }
+          }
+        ],
+        "weights": [
+          1.2,
+          0.9
+        ]
+      }
+    }
+  ],
+  "raw_content": "{\"round_analysis\": \"Previous round shows a clear pattern: operators on the [95,158] volume/order-flow and [29,95] momentum/volatility subspaces with moderate windows (10-15) produced the highest screen effects (lead_lag_beta 0.0041, path_efficiency 0.0039, vol_price_corr 0.0051), while short-window KBar [0,9] and very short windows (5-8) generally underperformed or failed validation (negative full effect). The best screen_effect came from vol_price_corr[95,158] w12 (0.0051) and lead_lag_beta[95,158] w10 (0.0041), yet their full-validation effect was negative — suggesting these single-operator kernels are too low-rank/too aligned and overfit the screen fold. Strategy for round 1: (a) evolve the top screen performers by combining them with complementary [29,95] and [9,29] channels to raise effective rank and decorrelate from 11^T/B; (b) build 3-5 channel symbolic predicates that mix volume/order-flow time-ops (std, autocorr_1, hurst_proxy, path_efficiency) with momentum slope/ema_diff and cross-interactions (corr, ratio, lead_lag) to enrich rank; (c) avoid tiny windows (>=8) and avoid pure [0,9] KBar-only descriptors; (d) include a few composite mix/concat blends of the strongest single operators (vol_price_corr, lead_lag_beta, path_efficiency) with orthogonal [29,95] operators to hedge the negative full-validation effect. All proposals use >=3 diverse weakly correlated channels or >=2 mixed parts to satisfy the rank gate.\", \"proposals\": [{\"kind\": \"statistical\", \"name\": \"VolFlowMomentumRankMix\", \"rationale\": \"Combine volume-price correlation (screen winner 0.0051) with momentum slope and path efficiency to add orthogonal rank dimensions and reduce collapse toward the global shrinkage kernel.\", \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 12}, \"channels\": [{\"time_op\": \"autocorr_1\", \"feature_op\": \"mean\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"corr\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"slope\", \"rhs_window\": 12, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"path_efficiency\", \"feature_op\": \"l2_norm\", \"window\": 14, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}, {\"time_op\": \"std\", \"feature_op\": \"top_bottom_spread\", \"window\": 10, \"feature_slice\": [95, 158], \"interaction\": \"ratio\", \"rhs_slice\": [9, 29], \"rhs_time_op\": \"mean\", \"rhs_window\": 10, \"transform\": \"abs\", \"weight\": 0.9}, {\"time_op\": \"ema_diff\", \"feature_op\": \"mean\", \"window\": 10, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.8}]}}, {\"kind\": \"statistical\", \"name\": \"LeadLagBetaVolHurst\", \"rationale\": \"Evolve lead_lag_beta[95,158] winner by adding hurst_proxy on [29,95] and semivar asymmetry to diversify rank while preserving order-flow lead-lag beta signal.\", \"parents\": [\"cand_85651dad6f5c554e\"], \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 10}, \"channels\": [{\"time_op\": \"hurst_proxy\", \"feature_op\": \"mean\", \"window\": 16, \"feature_slice\": [29, 95], \"interaction\": \"beta\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"ema_diff\", \"rhs_window\": 10, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"semivar_asymmetry\", \"feature_op\": \"std\", \"window\": 12, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}, {\"time_op\": \"autocorr_1\", \"feature_op\": \"l2_norm\", \"window\": 10, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}]}}, {\"kind\": \"statistical\", \"name\": \"PathEffVolPriceLeadLag\", \"rationale\": \"Blend path_efficiency[9,29] with vol_price_corr[95,158] and a lead_lag_corr cross-channel to decorrelate from ones-kernel and lift effective rank.\", \"parents\": [\"cand_9f6a64bf06f399aa\", \"cand_0b36af32ef866568\"], \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 14}, \"channels\": [{\"time_op\": \"path_efficiency\", \"feature_op\": \"mean\", \"window\": 14, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.1}, {\"time_op\": \"autocorr_1\", \"feature_op\": \"std\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"lead_lag_corr\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"slope\", \"rhs_window\": 12, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"q_spread\", \"feature_op\": \"iqr\", \"window\": 10, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.8}, {\"time_op\": \"ema_diff\", \"feature_op\": \"mean\", \"window\": 8, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.7}]}}, {\"kind\": \"statistical\", \"name\": \"OrderFlowMomentumHurstTriple\", \"rationale\": \"Triple of order-flow autocorr, momentum hurst, and vol-price ratio across three distinct subspaces to maximize effective rank and hedge single-operator overfit.\", \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 13}, \"channels\": [{\"time_op\": \"autocorr_1\", \"feature_op\": \"mean\", \"window\": 13, \"feature_slice\": [95, 158], \"interaction\": \"ratio\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"std\", \"rhs_window\": 13, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"hurst_proxy\", \"feature_op\": \"l2_norm\", \"window\": 15, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}, {\"time_op\": \"semivar_asymmetry\", \"feature_op\": \"std\", \"window\": 11, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}, {\"time_op\": \"slope\", \"feature_op\": \"mean\", \"window\": 9, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.7}]}}, {\"kind\": \"statistical\", \"name\": \"VolPriceBetaMomentumSlope\", \"rationale\": \"Use beta interaction between volume std and momentum slope plus a path-efficiency channel to capture cross-sectional dispersion in flow-adjusted momentum.\", \"parents\": [\"cand_0b36af32ef866568\"], \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 12}, \"channels\": [{\"time_op\": \"std\", \"feature_op\": \"mean\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"beta\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"slope\", \"rhs_window\": 12, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"path_efficiency\", \"feature_op\": \"l2_norm\", \"window\": 16, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}, {\"time_op\": \"autocorr_1\", \"feature_op\": \"top_bottom_spread\", \"window\": 10, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}, {\"time_op\": \"ema_diff\", \"feature_op\": \"mean\", \"window\": 9, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.7}]}}, {\"kind\": \"statistical\", \"name\": \"RegimeFlowAsymMomentum\", \"rationale\": \"Capture regime transitions via semivar asymmetry on volume plus momentum hurst and vol-price lead-lag to span multiple weakly correlated rank directions.\", \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 12}, \"channels\": [{\"time_op\": \"semivar_asymmetry\", \"feature_op\": \"mean\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"tanh\", \"weight\": 1.1}, {\"time_op\": \"hurst_proxy\", \"feature_op\": \"std\", \"window\": 16, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}, {\"time_op\": \"autocorr_1\", \"feature_op\": \"mean\", \"window\": 11, \"feature_slice\": [95, 158], \"interaction\": \"lead_lag_corr\", \"rhs_slice\": [9, 29], \"rhs_time_op\": \"slope\", \"rhs_window\": 10, \"transform\": \"abs\", \"weight\": 0.9}, {\"time_op\": \"path_efficiency\", \"feature_op\": \"l2_norm\", \"window\": 14, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.8}]}}, {\"kind\": \"statistical\", \"name\": \"FlowVolRatioTrendQspread\", \"rationale\": \"Ratio interaction of volume std to momentum mean plus trend-slope and iqr channels to enrich rank while keeping order-flow dominance.\", \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 12}, \"channels\": [{\"time_op\": \"std\", \"feature_op\": \"l2_norm\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"ratio\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"mean\", \"rhs_window\": 12, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"slope\", \"feature_op\": \"mean\", \"window\": 15, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}, {\"time_op\": \"q_spread\", \"feature_op\": \"iqr\", \"window\": 11, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}, {\"time_op\": \"ema_diff\", \"feature_op\": \"mean\", \"window\": 9, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.7}]}}, {\"kind\": \"statistical\", \"name\": \"MomentumFlowCorrHalfTriple\", \"rationale\": \"Use corr_half on momentum paired with flow autocorr and a hurst channel to capture half-window stability of flow-momentum coupling.\", \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 12}, \"channels\": [{\"time_op\": \"autocorr_1\", \"feature_op\": \"corr_half\", \"window\": 12, \"feature_slice\": [29, 95], \"interaction\": \"corr\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"std\", \"rhs_window\": 12, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"hurst_proxy\", \"feature_op\": \"mean\", \"window\": 16, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}, {\"time_op\": \"path_efficiency\", \"feature_op\": \"l2_norm\", \"window\": 13, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}]}}, {\"kind\": \"statistical\", \"name\": \"VolPriceCorrBetaPathEff\", \"rationale\": \"Evolve vol_price_corr winner by adding a beta interaction and path efficiency to raise effective rank and cross-sectional spread.\", \"parents\": [\"cand_0b36af32ef866568\"], \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 12}, \"channels\": [{\"time_op\": \"std\", \"feature_op\": \"mean\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"corr\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"slope\", \"rhs_window\": 12, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"path_efficiency\", \"feature_op\": \"l2_norm\", \"window\": 15, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}, {\"time_op\": \"autocorr_1\", \"feature_op\": \"top_bottom_spread\", \"window\": 11, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}, {\"time_op\": \"ema_diff\", \"feature_op\": \"mean\", \"window\": 8, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.7}]}}, {\"kind\": \"statistical\", \"name\": \"FlowLeadLagMomentumHurst\", \"rationale\": \"Lead-lag correlation between flow and momentum with hurst proxy on flow to isolate persistent order-flow regimes.\", \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 11}, \"channels\": [{\"time_op\": \"std\", \"feature_op\": \"mean\", \"window\": 11, \"feature_slice\": [95, 158], \"interaction\": \"lead_lag_corr\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"slope\", \"rhs_window\": 11, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"hurst_proxy\", \"feature_op\": \"l2_norm\", \"window\": 15, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}, {\"time_op\": \"semivar_asymmetry\", \"feature_op\": \"std\", \"window\": 12, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}]}}, {\"kind\": \"statistical\", \"name\": \"MomentumTrendFlowRatio\", \"rationale\": \"Ratio of momentum trend slope to flow volatility plus a q_spread and ema_diff channel to span rank across momentum and volume subspaces.\", \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 13}, \"channels\": [{\"time_op\": \"slope\", \"feature_op\": \"mean\", \"window\": 13, \"feature_slice\": [29, 95], \"interaction\": \"ratio\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"std\", \"rhs_window\": 13, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"q_spread\", \"feature_op\": \"iqr\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}, {\"time_op\": \"path_efficiency\", \"feature_op\": \"l2_norm\", \"window\": 14, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}, {\"time_op\": \"ema_diff\", \"feature_op\": \"mean\", \"window\": 9, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.7}]}}, {\"kind\": \"statistical\", \"name\": \"VolHurstMomentumBetaFlow\", \"rationale\": \"Beta of volume hurst on momentum slope plus a flow autocorr channel to capture persistent-flow-adjusted momentum ranking.\", \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 12}, \"channels\": [{\"time_op\": \"hurst_proxy\", \"feature_op\": \"mean\", \"window\": 14, \"feature_slice\": [95, 158], \"interaction\": \"beta\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"slope\", \"rhs_window\": 12, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"autocorr_1\", \"feature_op\": \"std\", \"window\": 11, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}, {\"time_op\": \"path_efficiency\", \"feature_op\": \"l2_norm\", \"window\": 15, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}, {\"time_op\": \"ema_diff\", \"feature_op\": \"mean\", \"window\": 8, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.7}]}}, {\"kind\": \"statistical\", \"name\": \"OrderFlowAsymMomentumCorr\", \"rationale\": \"Semivar asymmetry on flow with a momentum-flow corr channel and hurst proxy to diversify rank and reduce ones-alignment.\", \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 12}, \"channels\": [{\"time_op\": \"semivar_asymmetry\", \"feature_op\": \"mean\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"corr\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"slope\", \"rhs_window\": 12, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"hurst_proxy\", \"feature_op\": \"l2_norm\", \"window\": 15, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}, {\"time_op\": \"autocorr_1\", \"feature_op\": \"top_bottom_spread\", \"window\": 11, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}]}}, {\"kind\": \"statistical\", \"name\": \"PathEffFlowBetaHurst\", \"rationale\": \"Evolve path_efficiency[9,29] winner by pairing with flow beta and hurst proxy on [29,95] to raise rank while keeping path-efficiency signal.\", \"parents\": [\"cand_9f6a64bf06f399aa\"], \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 14}, \"channels\": [{\"time_op\": \"path_efficiency\", \"feature_op\": \"mean\", \"window\": 14, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.1}, {\"time_op\": \"std\", \"feature_op\": \"l2_norm\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"beta\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"slope\", \"rhs_window\": 12, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"hurst_proxy\", \"feature_op\": \"mean\", \"window\": 16, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}, {\"time_op\": \"ema_diff\", \"feature_op\": \"mean\", \"window\": 9, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.7}]}}, {\"kind\": \"statistical\", \"name\": \"FlowVolMomentumQspreadTriple\", \"rationale\": \"Combine flow std-to-momentum ratio, q_spread flow dispersion, and momentum slope to span three weakly correlated rank directions.\", \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 12}, \"channels\": [{\"time_op\": \"std\", \"feature_op\": \"top_bottom_spread\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"ratio\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"mean\", \"rhs_window\": 12, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"q_spread\", \"feature_op\": \"iqr\", \"window\": 11, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}, {\"time_op\": \"slope\", \"feature_op\": \"mean\", \"window\": 14, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}]}}, {\"kind\": \"statistical\", \"name\": \"MomentumHurstFlowLeadLagBeta\", \"rationale\": \"Momentum hurst with flow lead-lag correlation and beta to capture cross-sectional persistence of flow-momentum coupling.\", \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 12}, \"channels\": [{\"time_op\": \"hurst_proxy\", \"feature_op\": \"mean\", \"window\": 16, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.1}, {\"time_op\": \"autocorr_1\", \"feature_op\": \"std\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"lead_lag_corr\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"slope\", \"rhs_window\": 12, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"path_efficiency\", \"feature_op\": \"l2_norm\", \"window\": 14, \"feature_slice\": [95, 158], \"interaction\": \"beta\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"mean\", \"rhs_window\": 12, \"transform\": \"abs\", \"weight\": 0.9}]}}, {\"kind\": \"statistical\", \"name\": \"VolPriceCorrHurstSemivarMix\", \"rationale\": \"Mix vol-price corr with hurst proxy and semivar asymmetry across flow and momentum to maximize rank while hedging single-operator sign instability.\", \"parents\": [\"cand_0b36af32ef866568\"], \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 12}, \"channels\": [{\"time_op\": \"std\", \"feature_op\": \"mean\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"corr\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"slope\", \"rhs_window\": 12, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"hurst_proxy\", \"feature_op\": \"l2_norm\", \"window\": 15, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}, {\"time_op\": \"semivar_asymmetry\", \"feature_op\": \"std\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}, {\"time_op\": \"ema_diff\", \"feature_op\": \"mean\", \"window\": 9, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.7}]}}, {\"kind\": \"statistical\", \"name\": \"FlowMomentumRatioHurstQspread\", \"rationale\": \"Ratio of flow std to momentum slope combined with hurst and q_spread to span order-flow and momentum rank directions.\", \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 13}, \"channels\": [{\"time_op\": \"std\", \"feature_op\": \"l2_norm\", \"window\": 13, \"feature_slice\": [95, 158], \"interaction\": \"ratio\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"slope\", \"rhs_window\": 13, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"hurst_proxy\", \"feature_op\": \"mean\", \"window\": 16, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}, {\"time_op\": \"q_spread\", \"feature_op\": \"iqr\", \"window\": 11, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}]}}, {\"kind\": \"statistical\", \"name\": \"PathEffFlowMomentumBeta\", \"rationale\": \"Path efficiency on momentum with flow beta and autocorr channels to capture flow-adjusted momentum path quality.\", \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 14}, \"channels\": [{\"time_op\": \"path_efficiency\", \"feature_op\": \"l2_norm\", \"window\": 14, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.1}, {\"time_op\": \"std\", \"feature_op\": \"mean\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"beta\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"slope\", \"rhs_window\": 12, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"autocorr_1\", \"feature_op\": \"top_bottom_spread\", \"window\": 11, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}, {\"time_op\": \"ema_diff\", \"feature_op\": \"mean\", \"window\": 9, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.7}]}}, {\"kind\": \"statistical\", \"name\": \"SemivarFlowMomentumHurstLeadLag\", \"rationale\": \"Semivar flow asymmetry with momentum hurst and lead-lag corr to capture regime-conditional flow-momentum alignment.\", \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 12}, \"channels\": [{\"time_op\": \"semivar_asymmetry\", \"feature_op\": \"mean\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"tanh\", \"weight\": 1.1}, {\"time_op\": \"hurst_proxy\", \"feature_op\": \"l2_norm\", \"window\": 16, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}, {\"time_op\": \"autocorr_1\", \"feature_op\": \"std\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"lead_lag_corr\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"slope\", \"rhs_window\": 11, \"transform\": \"abs\", \"weight\": 0.9}]}}, {\"kind\": \"statistical\", \"name\": \"MomentumFlowCorrQspread\", \"rationale\": \"Correlation interaction of momentum mean with flow std plus q_spread and path efficiency to diversify rank.\", \"descriptor\": {\"family\": \"symbolic\", \"params\": {\"window\": 12}, \"channels\": [{\"time_op\": \"mean\", \"feature_op\": \"mean\", \"window\": 12, \"feature_slice\": [29, 95], \"interaction\": \"corr\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"std\", \"rhs_window\": 12, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"q_spread\", \"feature_op\": \"iqr\", \"window\": 11, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}, {\"time_op\": \"path_efficiency\", \"feature_op\": \"l2_norm\", \"window\": 14, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}, {\"time_op\": \"ema_diff\", \"feature_op\": \"mean\", \"window\": 9, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.7}]}}, {\"kind\": \"relational\", \"name\": \"VolPriceCorrOperator\", \"rationale\": \"Refine vol_price_corr operator with a mid window (12) on the volume subspace, the strongest screen performer, to test full-validation stability at slightly different scale.\", \"parents\": [\"cand_0b36af32ef866568\"], \"descriptor\": {\"family\": \"vol_price_corr\", \"feature_slice\": [95, 158], \"params\": {\"window\": 13}}}, {\"kind\": \"relational\", \"name\": \"LeadLagBetaOperator\", \"rationale\": \"Refine lead_lag_beta operator with window 11 on volume subspace to test whether slightly longer lookback improves full-validation effect.\", \"parents\": [\"cand_85651dad6f5c554e\"], \"descriptor\": {\"family\": \"lead_lag_beta\", \"feature_slice\": [95, 158], \"params\": {\"window\": 11}}}, {\"kind\": \"relational\", \"name\": \"PathEfficiencyOperator\", \"rationale\": \"Refine path_efficiency operator on momentum subspace with window 13 to test mid-window stability of the screen winner.\", \"parents\": [\"cand_9f6a64bf06f399aa\"], \"descriptor\": {\"family\": \"path_efficiency\", \"feature_slice\": [29, 95], \"params\": {\"window\": 13}}}, {\"kind\": \"composite\", \"name\": \"FlowMomentumCompositeMix\", \"rationale\": \"Convex mix of vol_price_corr, lead_lag_beta, and path_efficiency kernels to hedge single-operator negative full-validation effect and raise effective rank.\", \"parents\": [\"cand_0b36af32ef866568\", \"cand_85651dad6f5c554e\", \"cand_9f6a64bf06f399aa\"], \"descriptor\": {\"family\": \"composite\", \"combine\": \"mix\", \"parts\": [{\"family\": \"vol_price_corr\", \"feature_slice\": [95, 158], \"params\": {\"window\": 12}}, {\"family\": \"lead_lag_beta\", \"feature_slice\": [95, 158], \"params\": {\"window\": 10}}, {\"family\": \"path_efficiency\", \"feature_slice\": [29, 95], \"params\": {\"window\": 14}}], \"weights\": [1.2, 1.0, 0.9]}}, {\"kind\": \"composite\", \"name\": \"FlowMomentumHurstCompositeConcat\", \"rationale\": \"Concat of vol_price_corr and hurst_vr operators to span order-flow correlation and momentum persistence rank directions.\", \"parents\": [\"cand_0b36af32ef866568\", \"cand_bb5a4c068b5f1631\"], \"descriptor\": {\"family\": \"composite\", \"combine\": \"concat\", \"parts\": [{\"family\": \"vol_price_corr\", \"feature_slice\": [95, 158], \"params\": {\"window\": 12}}, {\"family\": \"hurst_vr\", \"feature_slice\": [29, 95], \"params\": {\"window\": 16}}, {\"family\": \"semivar_ratio\", \"feature_slice\": [95, 158], \"params\": {\"window\": 12}}], \"weights\": [1.2, 1.0, 0.8]}}, {\"kind\": \"composite\", \"name\": \"SymbolicFlowMomentumComposite\", \"rationale\": \"Mix a 4-channel symbolic flow-momentum predicate with a path_efficiency operator to combine rank-rich symbolic structure with a stable single operator.\", \"parents\": [\"cand_9f6a64bf06f399aa\"], \"descriptor\": {\"family\": \"composite\", \"combine\": \"mix\", \"parts\": [{\"family\": \"symbolic\", \"params\": {\"window\": 12}, \"channels\": [{\"time_op\": \"autocorr_1\", \"feature_op\": \"mean\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"corr\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"slope\", \"rhs_window\": 12, \"transform\": \"tanh\", \"weight\": 1.2}, {\"time_op\": \"hurst_proxy\", \"feature_op\": \"l2_norm\", \"window\": 15, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}, {\"time_op\": \"semivar_asymmetry\", \"feature_op\": \"std\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}]}, {\"family\": \"path_efficiency\", \"feature_slice\": [29, 95], \"params\": {\"window\": 14}}], \"weights\": [1.2, 0.9]}}]}",
+  "system_prompt": "You are an autonomous Quantitative Financial AI Scientist in PredicateLab (TSIL domain).\nYour objective is to construct mathematically rigorous relational predicates P(X) for the LUSI (Learning Using Statistical Invariants) loss on the CSI300 daily Alpha158 stock panel:\n    L(y, y_hat) = tau_hat * ||y - y_hat||_I^2 + tau * (y - y_hat)^T P(X) (y - y_hat)\nwhere batch_x has shape [B, T=20, F=158], phi(X) in R^(B x d) is standardized per column and normalized to unit Frobenius norm, and P(X) = phi_hat(X) @ phi_hat(X)^T.\n\nCRITICAL SCIENTIFIC & MATHEMATICAL CONSTRAINTS:\n1. Non-Collapse / High Effective Rank Gate:\n   Every candidate is tested on a real CSI300 batch before training. If participation-ratio effective rank r_eff(P) = (tr(P))^2 / ||P||_F^2 < 1.25 or off-diagonal cosine alignment with 11^T/B > 0.98, the kernel collapses to the trivial global shrinkage control (`control:ones`) and is REJECTED.\n   Therefore, design descriptors with d >= 3 diverse, weakly correlated dimensions!\n2. Beat Both MSE Baseline and `control:ones`:\n   A candidate is only validated if paired Delta_IC > min_effect, its 95% block-bootstrap CI lower bound > 0, AND it outperforms `control:ones`.\n3. Alpha158 Feature Subspace Map (feature_dim=158, valid slice [start, end] with 0 <= start < end <= 158 and end - start >= 2):\n   - [0, 9]: KBar intraday candlestick morphology (body, upper/lower shadow, shift)\n   - [9, 29]: Raw price/VWAP channels across short lags\n   - [29, 95]: Rolling return, momentum, trend R^2, volatility, skewness, rank, support/resistance\n   - [95, 158]: Volume, order-flow imbalance, volume-weighted volatility, price-volume correlation\n\nALLOWED DESCRIPTOR SCHEMAS (Pure JSON data, no Python code):\n\nSchema A — Novel LLM-Constructed Symbolic Tensor Predicate (`family: \"symbolic\"`, `kind: \"statistical\" | \"relational\" | \"soft\"`):\n{\n  \"kind\": \"statistical\",\n  \"name\": \"concise descriptive name\",\n  \"rationale\": \"financial & statistical hypothesis explaining why this kernel aligns residuals\",\n  \"parents\": [\"optional_parent_candidate_id\"],\n  \"descriptor\": {\n    \"family\": \"symbolic\",\n    \"params\": {\"window\": 12},\n    \"channels\": [\n      {\n        \"time_op\": \"one of: mean|std|slope|accel|ema_diff|max_drawdown|semivar_asymmetry|skew|kurt|q_spread|autocorr_1|hurst_proxy|path_efficiency\",\n        \"feature_op\": \"one of: mean|std|max|min|iqr|l2_norm|top_bottom_spread|corr_half\",\n        \"window\": 10,\n        \"feature_slice\": [29, 95],\n        \"interaction\": \"one of: none|diff|ratio|product|corr|beta|lead_lag_corr\",\n        \"rhs_slice\": [95, 158],\n        \"rhs_time_op\": \"optional time_op when interaction in diff|ratio|product\",\n        \"rhs_window\": 15,\n        \"transform\": \"one of: identity|abs|tanh|sign_sqrt\",\n        \"weight\": 1.0\n      }\n      // MUST include between 3 and 6 distinct channel objects in `channels`\n    ]\n  }\n}\n\nSchema B — Atomic Mathematical Operator Predicate (`kind: \"statistical\" | \"soft\" | \"relational\"`):\n- Allowed `family`: \"semivar_ratio\" | \"vol_price_corr\" | \"path_efficiency\" | \"hurst_vr\" | \"lead_lag_beta\" | \"regime_transition\" | \"tail_asymmetry\" | \"momentum\" | \"volatility\" | \"dispersion\" | \"autocorr\" | \"drawdown\" | \"tail\" | \"trend\"\n- `params`: {\"window\": integer in [3, 20]}\n- Optional `feature_slice`: [start, end]\n\nSchema C — DSL-Composed Multi-Mechanism Predicate (`family: \"composite\"`, `kind: \"composite\"`):\n{\n  \"kind\": \"composite\",\n  \"name\": \"concise composite name\",\n  \"rationale\": \"why combining these mechanisms improves cross-sectional IC ranking\",\n  \"parents\": [\"optional_parent_candidate_id\"],\n  \"descriptor\": {\n    \"family\": \"composite\",\n    \"combine\": \"concat\",  // \"concat\" (for DSL/symbolic parts) or \"mix\" (kernel convex combination, required if any part is family=\"native\")\n    \"parts\": [ /* 2 to 4 valid Schema A or Schema B (or native) descriptor dicts */ ],\n    \"weights\": [1.2, 1.0, 0.8]  // positive floats in (0, 10], same length as parts\n  }\n}\n\nMODE DIRECTIVE FOR THIS RUN:\nFocus primarily (>= 75% of proposals) on NOVEL SYMBOLIC PREDICATES (`family: \"symbolic\"` with 3..6 custom mathematical channels) and novel operator primitives (`semivar_ratio`, `vol_price_corr`, `path_efficiency`, `hurst_vr`, `lead_lag_beta`, `regime_transition`, `tail_asymmetry`).\n\nReturn strictly a JSON object with keys:\n{\n  \"round_analysis\": \"concise synthesis of empirical evidence and hypothesis strategy for this round\",\n  \"proposals\": [ /* list of 26 candidate objects */ ]\n}",
+  "user_prompt": "Round Index: 1\nTarget Valid Proposals Needed: 20 (please output 26 diverse proposals so we have buffer after deduplication).\nTask Question: Under an identical LSTM, identical folds and an identical training budget, do LLM-constructed predicates (novel symbolic tensor formulas and DSL compositions) improve daily cross-sectional IC relative to plain MSE, the Phi_ones control, and a deterministic rule-based DSL search?\nAlready Evaluated Template Count: 20\n\n=== EMPIRICAL FEEDBACK FROM PREVIOUS DISCOVERY ROUND (Discovery Folds Only) ===\n\n[INSUFFICIENT EVIDENCE (Promoted to Full Validation, Partial/Sub-threshold)] (count=3):\n  - id=cand_85651dad6f5c554e | effect=-0.001234863409618337 | screen_effect=0.004126464605181681 | stability=None | reason=\n    descriptor={\"family\": \"lead_lag_beta\", \"feature_slice\": [95, 158], \"params\": {\"window\": 10}}\n  - id=cand_9f6a64bf06f399aa | effect=-0.0034156100041130497 | screen_effect=0.003944170134026775 | stability=None | reason=\n    descriptor={\"family\": \"path_efficiency\", \"feature_slice\": [9, 29], \"params\": {\"window\": 15}}\n  - id=cand_0b36af32ef866568 | effect=-0.004077625876411531 | screen_effect=0.005076725565709967 | stability=None | reason=\n    descriptor={\"family\": \"vol_price_corr\", \"feature_slice\": [95, 158], \"params\": {\"window\": 12}}\n\n[SCREENED OUT (Evaluated on Screen Fold)] (count=16):\n  - id=cand_f442301ab6b26ea7 | effect=None | screen_effect=0.0037262694436967178 | stability=None | reason=\n    descriptor={\"channels\": [{\"feature_op\": \"l2_norm\", \"feature_slice\": [95, 158], \"interaction\": \"ratio\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"std\", \"rhs_window\": 12, \"time_op\": \"std\", \"transform\": \"tanh\", \"weight\": 0.9, \"window\": 12}, {\"feature_op\": \"mean\", \"feature_slice\": [29, 95], \"interaction\": \"none\", \"time_op\": \"hurst_proxy\", \"transform\": \"identity\", \"weight\": 1.2, \"window\": 18}, {\"feature_op\": \"mean\", \"feature_slice\": [9, 29], \"interaction\": \"none\", \"time_op\": \"autocorr_1\", \"transform\": \"abs\", \"weight\": 0.8, \"window\": 8}], \"family\": \"symbolic\", \"params\": {\"window\": 18}}\n  - id=cand_d7d86ab735cf2e9d | effect=None | screen_effect=0.0032429605659291573 | stability=None | reason=\n    descriptor={\"family\": \"tail_asymmetry\", \"feature_slice\": [0, 9], \"params\": {\"window\": 8}}\n  - id=cand_2e93607f21e68908 | effect=None | screen_effect=0.0024462228336881203 | stability=None | reason=\n    descriptor={\"channels\": [{\"feature_op\": \"l2_norm\", \"feature_slice\": [29, 95], \"interaction\": \"none\", \"time_op\": \"path_efficiency\", \"transform\": \"identity\", \"weight\": 1.2, \"window\": 15}, {\"feature_op\": \"mean\", \"feature_slice\": [95, 158], \"interaction\": \"corr\", \"rhs_slice\": [9, 29], \"rhs_time_op\": \"slope\", \"rhs_window\": 12, \"time_op\": \"autocorr_1\", \"transform\": \"tanh\", \"weight\": 0.8, \"window\": 12}, {\"feature_op\": \"std\", \"feature_slice\": [29, 95], \"interaction\": \"none\", \"time_op\": \"hurst_proxy\", \"transform\": \"sign_sqrt\", \"weight\": 0.9, \"window\": 18}], \"family\": \"symbolic\", \"params\": {\"window\": 15}}\n  - id=cand_8c9b46d7c87daa7c | effect=None | screen_effect=0.002396349051344764 | stability=None | reason=\n    descriptor={\"channels\": [{\"feature_op\": \"iqr\", \"feature_slice\": [29, 95], \"interaction\": \"diff\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"ema_diff\", \"rhs_window\": 12, \"time_op\": \"slope\", \"transform\": \"abs\", \"weight\": 1.1, \"window\": 12}, {\"feature_op\": \"mean\", \"feature_slice\": [0, 9], \"interaction\": \"none\", \"time_op\": \"semivar_asymmetry\", \"transform\": \"tanh\", \"weight\": 1.0, \"window\": 10}, {\"feature_op\": \"top_bottom_spread\", \"feature_slice\": [95, 158], \"interaction\": \"ratio\", \"rhs_slice\": [9, 29], \"rhs_time_op\": \"mean\", \"rhs_window\": 8, \"time_op\": \"std\", \"transform\": \"identity\", \"weight\": 0.9, \"window\": 8}], \"family\": \"symbolic\", \"params\": {\"window\": 10}}\n  - id=cand_8b07af32ee589264 | effect=None | screen_effect=0.0018651126809761246 | stability=None | reason=\n    descriptor={\"family\": \"semivar_ratio\", \"feature_slice\": [29, 95], \"params\": {\"window\": 10}}\n  - id=cand_6d018f3dc74ee90b | effect=None | screen_effect=0.0017934750298519487 | stability=None | reason=\n    descriptor={\"channels\": [{\"feature_op\": \"corr_half\", \"feature_slice\": [95, 158], \"interaction\": \"corr\", \"rhs_slice\": [9, 29], \"rhs_time_op\": \"slope\", \"rhs_window\": 10, \"time_op\": \"std\", \"transform\": \"identity\", \"weight\": 1.0, \"window\": 10}, {\"feature_op\": \"mean\", \"feature_slice\": [0, 9], \"interaction\": \"none\", \"time_op\": \"ema_diff\", \"transform\": \"abs\", \"weight\": 0.8, \"window\": 6}, {\"feature_op\": \"std\", \"feature_slice\": [29, 95], \"interaction\": \"none\", \"time_op\": \"semivar_asymmetry\", \"transform\": \"tanh\", \"weight\": 1.1, \"window\": 12}], \"family\": \"symbolic\", \"params\": {\"window\": 12}}\n  - id=cand_3356b513854a5164 | effect=None | screen_effect=0.0016124976353271696 | stability=None | reason=\n    descriptor={\"channels\": [{\"feature_op\": \"corr_half\", \"feature_slice\": [95, 158], \"interaction\": \"corr\", \"rhs_slice\": [9, 29], \"rhs_time_op\": \"slope\", \"rhs_window\": 6, \"time_op\": \"std\", \"transform\": \"tanh\", \"weight\": 1.1, \"window\": 6}, {\"feature_op\": \"iqr\", \"feature_slice\": [0, 9], \"interaction\": \"none\", \"time_op\": \"q_spread\", \"transform\": \"abs\", \"weight\": 1.0, \"window\": 5}, {\"feature_op\": \"mean\", \"feature_slice\": [29, 95], \"interaction\": \"none\", \"time_op\": \"autocorr_1\", \"transform\": \"identity\", \"weight\": 0.9, \"window\": 7}], \"family\": \"symbolic\", \"params\": {\"window\": 5}}\n  - id=cand_bb5a4c068b5f1631 | effect=None | screen_effect=0.001532218826974977 | stability=None | reason=\n    descriptor={\"family\": \"hurst_vr\", \"feature_slice\": [29, 95], \"params\": {\"window\": 18}}\n\n[REJECTED / NEGATIVE] (count=1):\n  - id=cand_d419cd61dd5b8b40 | effect=-0.0024434395041188516 | screen_effect=0.003957881814794202 | stability=None | reason=\n    descriptor={\"channels\": [{\"feature_op\": \"mean\", \"feature_slice\": [9, 29], \"interaction\": \"corr\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"std\", \"rhs_window\": 8, \"time_op\": \"accel\", \"transform\": \"tanh\", \"weight\": 1.1, \"window\": 8}, {\"feature_op\": \"std\", \"feature_slice\": [29, 95], \"interaction\": \"none\", \"time_op\": \"skew\", \"transform\": \"abs\", \"weight\": 1.0, \"window\": 12}, {\"feature_op\": \"top_bottom_spread\", \"feature_slice\": [95, 158], \"interaction\": \"none\", \"time_op\": \"ema_diff\", \"transform\": \"identity\", \"weight\": 0.9, \"window\": 10}], \"family\": \"symbolic\", \"params\": {\"window\": 8}}\n\nINSTRUCTIONS FOR EVOLUTIONARY ROUND 1:\n1. Analyze which operator families, symbolic channels, lookback windows, and feature slices achieved the highest positive `screen_effect` and full-validation `effect`.\n2. Evolve the top-performing candidates by refining their window scales, isolating informative Alpha158 subspaces ([0,9], [9,29], [29,95], [95,158]), adding cross-channel interactions (`lead_lag_corr`, `beta`, `corr`, `ratio`), or combining complementary winners via `composite` (`concat` or `mix`).\n3. Set `parents` to the `candidate_id`s of the previous-round candidates you are evolving.\n4. Do NOT repeat any descriptor already listed above."
+}

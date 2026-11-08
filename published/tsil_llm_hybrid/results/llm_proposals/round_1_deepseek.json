@@ -1,0 +1,1620 @@
+{
+  "ok": true,
+  "model": "deepseek-flash",
+  "latency_s": 32.648,
+  "usage": {
+    "prompt_tokens": 4160,
+    "completion_tokens": 8257,
+    "total_tokens": 12417,
+    "prompt_tokens_details": {
+      "cached_tokens": 1152
+    },
+    "prompt_cache_hit_tokens": 1152,
+    "prompt_cache_miss_tokens": 3008
+  },
+  "error": "",
+  "analysis": "Previous round produced 4 promoted candidates (screen_effect 0.0039-0.0050) but none survived full validation (effects -0.0009 to -0.0029). The strongest screen signals combined (i) momentum/trend slope from [29,95] with (ii) volume/order-flow statistics from [95,158] and (iii) short-horizon KBar morphology from [0,9]. Screened-out candidates reveal that pure single-operator primitives (vol_price_corr, path_efficiency, tail_asymmetry) and overly short windows (4-6) underperformed, while window 10-20 channels with cross-slice interactions (ratio/product/diff) dominated. Strategy for Round 1: (a) reweight toward cross-slice ratio/product interactions that link [29,95] trend with [95,158] volume; (b) use mid-length windows 10-20 to avoid noise; (c) build composites mixing a trend/momentum mechanism, a volume-imbalance mechanism, and a volatility-regime mechanism; (d) explicitly evolve parents cand_a9e1a3f704a1c088 (ema_diff trend) and cand_730c1c3356d36068 (slope/ratio) by refining window scales and adding lead_lag_corr / beta interactions across the price-volume boundary.",
+  "reasoning_content": "",
+  "n_proposals": 27,
+  "proposals": [
+    {
+      "kind": "statistical",
+      "name": "trend_volume_ratio_triplet",
+      "rationale": "Momentum slope in [29,95] normalized by volume volatility in [95,158] captures informed-trading persistence; adding KBar body symmetry gives a slow/fast regime separator.",
+      "parents": [
+        "cand_a9e1a3f704a1c088"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 15
+        },
+        "channels": [
+          {
+            "time_op": "slope",
+            "feature_op": "mean",
+            "window": 15,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "ratio",
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "rhs_time_op": "std",
+            "rhs_window": 15,
+            "transform": "tanh",
+            "weight": 1.3
+          },
+          {
+            "time_op": "ema_diff",
+            "feature_op": "mean",
+            "window": 12,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "diff",
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "rhs_time_op": "mean",
+            "rhs_window": 12,
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "semivar_asymmetry",
+            "feature_op": "mean",
+            "window": 10,
+            "feature_slice": [
+              0,
+              9
+            ],
+            "interaction": "none",
+            "transform": "sign_sqrt",
+            "weight": 0.8
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "lead_lag_price_volume_beta",
+      "rationale": "Lead-lag correlation between price momentum and lagged volume imbalance identifies informed order flow; beta interaction captures sensitivity of returns to volume shocks.",
+      "parents": [
+        "cand_825f4af9468350c5"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 14
+        },
+        "channels": [
+          {
+            "time_op": "mean",
+            "feature_op": "mean",
+            "window": 14,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "lead_lag_corr",
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "rhs_time_op": "mean",
+            "rhs_window": 14,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "std",
+            "feature_op": "std",
+            "window": 14,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "beta",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "mean",
+            "rhs_window": 14,
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "mean",
+            "window": 10,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.8
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "path_efficiency_volume_regime",
+      "rationale": "Path efficiency of trend channels plus volume-weighted volatility separates clean directional moves from choppy mean-reverting regimes, aligning IC sign consistently.",
+      "parents": [
+        "cand_730c1c3356d36068"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 16
+        },
+        "channels": [
+          {
+            "time_op": "path_efficiency",
+            "feature_op": "l2_norm",
+            "window": 16,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "ratio",
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "rhs_time_op": "std",
+            "rhs_window": 16,
+            "transform": "identity",
+            "weight": 1.2
+          },
+          {
+            "time_op": "hurst_proxy",
+            "feature_op": "mean",
+            "window": 16,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "tanh",
+            "weight": 1.0
+          },
+          {
+            "time_op": "q_spread",
+            "feature_op": "iqr",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "kbar_skew_trend_product",
+      "rationale": "KBar skewness (intraday rejection) multiplied by trend strength in [29,95] captures reversal-vs-continuation asymmetry; volume std anchors the scale.",
+      "parents": [
+        "cand_dddb69d2a3f27821"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 12
+        },
+        "channels": [
+          {
+            "time_op": "skew",
+            "feature_op": "top_bottom_spread",
+            "window": 12,
+            "feature_slice": [
+              0,
+              9
+            ],
+            "interaction": "product",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "slope",
+            "rhs_window": 12,
+            "transform": "tanh",
+            "weight": 1.3
+          },
+          {
+            "time_op": "std",
+            "feature_op": "std",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "accel",
+            "feature_op": "mean",
+            "window": 8,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "sign_sqrt",
+            "weight": 0.8
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "semivar_asym_volume_corr",
+      "rationale": "Semivariance asymmetry in momentum channels combined with price-volume correlation separates downside-volume regimes that dominate CSI300 cross-section.",
+      "parents": [
+        "cand_730c1c3356d36068"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 18
+        },
+        "channels": [
+          {
+            "time_op": "semivar_asymmetry",
+            "feature_op": "mean",
+            "window": 18,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "corr",
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "rhs_time_op": "mean",
+            "rhs_window": 18,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "max_drawdown",
+            "feature_op": "l2_norm",
+            "window": 14,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 1.0
+          },
+          {
+            "time_op": "kurt",
+            "feature_op": "iqr",
+            "window": 14,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "ema_diff_volume_ratio_long",
+      "rationale": "Long-window EMA-diff on price channels scaled by volume std is a normalized momentum shock; the ratio stabilizes cross-sectional ranking across volatility regimes.",
+      "parents": [
+        "cand_a9e1a3f704a1c088"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 20
+        },
+        "channels": [
+          {
+            "time_op": "ema_diff",
+            "feature_op": "mean",
+            "window": 20,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "ratio",
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "rhs_time_op": "std",
+            "rhs_window": 20,
+            "transform": "identity",
+            "weight": 1.3
+          },
+          {
+            "time_op": "slope",
+            "feature_op": "mean",
+            "window": 10,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "tanh",
+            "weight": 1.0
+          },
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "std",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "relational",
+      "name": "vol_price_corr_trend_beta",
+      "rationale": "Cross-sectional vol-price correlation primitives were weak alone; conditioning on trend beta in [29,95] yields a signed relational predicate that amplifies residual alignment.",
+      "parents": [
+        "cand_730c1c3356d36068"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 15
+        },
+        "channels": [
+          {
+            "time_op": "mean",
+            "feature_op": "mean",
+            "window": 15,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "corr",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "slope",
+            "rhs_window": 15,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "std",
+            "feature_op": "std",
+            "window": 12,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "q_spread",
+            "feature_op": "top_bottom_spread",
+            "window": 8,
+            "feature_slice": [
+              0,
+              9
+            ],
+            "interaction": "none",
+            "transform": "sign_sqrt",
+            "weight": 0.8
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "hurst_volume_lead_lag",
+      "rationale": "Hurst proxy of trend plus lead-lag correlation with volume identifies persistent informed moves; window 16 balances estimation noise vs. signal.",
+      "parents": [
+        "cand_730c1c3356d36068"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 16
+        },
+        "channels": [
+          {
+            "time_op": "hurst_proxy",
+            "feature_op": "mean",
+            "window": 16,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "lead_lag_corr",
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "rhs_time_op": "mean",
+            "rhs_window": 16,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "std",
+            "feature_op": "std",
+            "window": 16,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "path_efficiency",
+            "feature_op": "mean",
+            "window": 12,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.8
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "momentum_kbar_ratio_short",
+      "rationale": "Short-horizon momentum in [29,95] ratio to KBar range isolates intraday-vs-multi-day divergence, a known reversal signal in A-shares.",
+      "parents": [
+        "cand_dddb69d2a3f27821"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 10
+        },
+        "channels": [
+          {
+            "time_op": "mean",
+            "feature_op": "mean",
+            "window": 10,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "ratio",
+            "rhs_slice": [
+              0,
+              9
+            ],
+            "rhs_time_op": "std",
+            "rhs_window": 10,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "ema_diff",
+            "feature_op": "mean",
+            "window": 8,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "skew",
+            "feature_op": "std",
+            "window": 10,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "tanh",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "volume_skew_trend_diff",
+      "rationale": "Difference between volume skewness and trend EMA-diff captures divergence between order-flow crowding and price direction, a robust residual-alignment predicate.",
+      "parents": [
+        "cand_a9e1a3f704a1c088"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 14
+        },
+        "channels": [
+          {
+            "time_op": "skew",
+            "feature_op": "mean",
+            "window": 14,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "diff",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "ema_diff",
+            "rhs_window": 14,
+            "transform": "tanh",
+            "weight": 1.3
+          },
+          {
+            "time_op": "std",
+            "feature_op": "std",
+            "window": 14,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "semivar_asymmetry",
+            "feature_op": "mean",
+            "window": 10,
+            "feature_slice": [
+              0,
+              9
+            ],
+            "interaction": "none",
+            "transform": "sign_sqrt",
+            "weight": 0.8
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "regime_transition_volume",
+      "rationale": "Regime transition in trend channels combined with volume imbalance marks breakout vs fade regimes; product interaction captures the joint signal.",
+      "parents": [
+        "cand_730c1c3356d36068"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 18
+        },
+        "channels": [
+          {
+            "time_op": "accel",
+            "feature_op": "mean",
+            "window": 18,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "product",
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "rhs_time_op": "ema_diff",
+            "rhs_window": 18,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "hurst_proxy",
+            "feature_op": "l2_norm",
+            "window": 14,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "kurt",
+            "feature_op": "iqr",
+            "window": 12,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "trend_qspread_beta_long",
+      "rationale": "Long-window trend slope with beta to volume IQR captures sensitivity of momentum to liquidity shocks; q_spread of KBar adds microstructure asymmetry.",
+      "parents": [
+        "cand_a9e1a3f704a1c088"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 20
+        },
+        "channels": [
+          {
+            "time_op": "slope",
+            "feature_op": "mean",
+            "window": 20,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "beta",
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "rhs_time_op": "q_spread",
+            "rhs_window": 20,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "std",
+            "feature_op": "iqr",
+            "window": 16,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "q_spread",
+            "feature_op": "top_bottom_spread",
+            "window": 8,
+            "feature_slice": [
+              0,
+              9
+            ],
+            "interaction": "none",
+            "transform": "sign_sqrt",
+            "weight": 0.8
+          }
+        ]
+      }
+    },
+    {
+      "kind": "statistical",
+      "name": "autocorr_volume_momentum",
+      "rationale": "Autocorrelation of volume channels measures order-flow persistence; interacting with momentum slope via lead_lag_corr gives a clean cross-sectional signal.",
+      "parents": [
+        "cand_730c1c3356d36068"
+      ],
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 14
+        },
+        "channels": [
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "mean",
+            "window": 14,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "lead_lag_corr",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "slope",
+            "rhs_window": 14,
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "mean",
+            "feature_op": "mean",
+            "window": 10,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "max_drawdown",
+            "feature_op": "l2_norm",
+            "window": 12,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "abs",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "trend_volume_kbar_mix",
+      "rationale": "Convex mix of a trend-slope descriptor, a volume-imbalance descriptor, and a KBar morphology descriptor spans three weakly correlated mechanisms yielding high effective rank.",
+      "parents": [
+        "cand_a9e1a3f704a1c088"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "trend",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 15
+            }
+          },
+          {
+            "family": "volatility",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 12
+            }
+          },
+          {
+            "family": "tail_asymmetry",
+            "feature_slice": [
+              0,
+              9
+            ],
+            "params": {
+              "window": 10
+            }
+          }
+        ],
+        "weights": [
+          1.3,
+          1.0,
+          0.8
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "lead_lag_vol_price_concat",
+      "rationale": "Concat of lead-lag beta between price and volume with a vol-price correlation primitive and a path-efficiency trend primitive covers three time scales within one kernel.",
+      "parents": [
+        "cand_825f4af9468350c5"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "lead_lag_beta",
+            "feature_slice": [
+              29,
+              158
+            ],
+            "params": {
+              "window": 14
+            }
+          },
+          {
+            "family": "vol_price_corr",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 12
+            }
+          },
+          {
+            "family": "path_efficiency",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 16
+            }
+          }
+        ],
+        "weights": [
+          1.2,
+          1.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "semivar_momentum_drawdown_mix",
+      "rationale": "Semivariance asymmetry, momentum, and drawdown primitives are complementary downside/upside mechanisms; mix weights emphasize semivar for A-share skewness.",
+      "parents": [
+        "cand_dddb69d2a3f27821"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "semivar_ratio",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 16
+            }
+          },
+          {
+            "family": "momentum",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "drawdown",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 14
+            }
+          }
+        ],
+        "weights": [
+          1.3,
+          1.0,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "hurst_regime_volume_concat",
+      "rationale": "Hurst variance-ratio, regime transition, and volume dispersion span long-memory, state-change, and liquidity mechanisms; concat preserves orthogonal subspaces.",
+      "parents": [
+        "cand_730c1c3356d36068"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "hurst_vr",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 18
+            }
+          },
+          {
+            "family": "regime_transition",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 12
+            }
+          },
+          {
+            "family": "dispersion",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 14
+            }
+          }
+        ],
+        "weights": [
+          1.2,
+          1.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "symbolic_trend_plus_volume_mix",
+      "rationale": "Mix of a two-channel symbolic trend/volume formula with a native volatility primitive; multi-scale windows 12 and 18 reduce single-window overfit.",
+      "parents": [
+        "cand_a9e1a3f704a1c088"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "symbolic",
+            "params": {
+              "window": 12
+            },
+            "channels": [
+              {
+                "time_op": "slope",
+                "feature_op": "mean",
+                "window": 12,
+                "feature_slice": [
+                  29,
+                  95
+                ],
+                "interaction": "ratio",
+                "rhs_slice": [
+                  95,
+                  158
+                ],
+                "rhs_time_op": "std",
+                "rhs_window": 12,
+                "transform": "tanh",
+                "weight": 1.2
+              },
+              {
+                "time_op": "semivar_asymmetry",
+                "feature_op": "mean",
+                "window": 10,
+                "feature_slice": [
+                  0,
+                  9
+                ],
+                "interaction": "none",
+                "transform": "sign_sqrt",
+                "weight": 0.9
+              },
+              {
+                "time_op": "std",
+                "feature_op": "std",
+                "window": 12,
+                "feature_slice": [
+                  95,
+                  158
+                ],
+                "interaction": "none",
+                "transform": "identity",
+                "weight": 1.0
+              }
+            ]
+          },
+          {
+            "family": "volatility",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 18
+            }
+          }
+        ],
+        "weights": [
+          1.3,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "kbar_volume_autocorr_concat",
+      "rationale": "KBar tail asymmetry, volume-price correlation, and autocorrelation span microstructure, order-flow, and persistence; concat yields three diverse kernel dimensions.",
+      "parents": [
+        "cand_dddb69d2a3f27821"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "tail_asymmetry",
+            "feature_slice": [
+              0,
+              9
+            ],
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "vol_price_corr",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 14
+            }
+          },
+          {
+            "family": "autocorr",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 12
+            }
+          }
+        ],
+        "weights": [
+          1.1,
+          1.2,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "momentum_trend_volume_mix_4",
+      "rationale": "Four-mechanism mix: momentum, trend, volume dispersion, and drawdown. Four weakly correlated parts maximize effective rank while staying below 4-part limit.",
+      "parents": [
+        "cand_730c1c3356d36068"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "momentum",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "trend",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 16
+            }
+          },
+          {
+            "family": "dispersion",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 12
+            }
+          },
+          {
+            "family": "drawdown",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 18
+            }
+          }
+        ],
+        "weights": [
+          1.2,
+          1.0,
+          0.9,
+          0.8
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "symbolic_trend_volume_plus_hurst",
+      "rationale": "Symbolic trend-volume ratio plus native Hurst variance-ratio primitive captures both normalized momentum and long-memory persistence; mix weights favor the symbolic part.",
+      "parents": [
+        "cand_a9e1a3f704a1c088"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "symbolic",
+            "params": {
+              "window": 16
+            },
+            "channels": [
+              {
+                "time_op": "ema_diff",
+                "feature_op": "mean",
+                "window": 16,
+                "feature_slice": [
+                  29,
+                  95
+                ],
+                "interaction": "ratio",
+                "rhs_slice": [
+                  95,
+                  158
+                ],
+                "rhs_time_op": "std",
+                "rhs_window": 16,
+                "transform": "identity",
+                "weight": 1.3
+              },
+              {
+                "time_op": "skew",
+                "feature_op": "iqr",
+                "window": 12,
+                "feature_slice": [
+                  95,
+                  158
+                ],
+                "interaction": "none",
+                "transform": "abs",
+                "weight": 0.9
+              },
+              {
+                "time_op": "accel",
+                "feature_op": "mean",
+                "window": 8,
+                "feature_slice": [
+                  0,
+                  9
+                ],
+                "interaction": "none",
+                "transform": "sign_sqrt",
+                "weight": 0.8
+              }
+            ]
+          },
+          {
+            "family": "hurst_vr",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 18
+            }
+          }
+        ],
+        "weights": [
+          1.4,
+          0.8
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "lead_lag_semivar_path_concat",
+      "rationale": "Lead-lag beta, semivariance ratio, and path efficiency cover directional, downside, and efficiency mechanisms; concat preserves distinct subspaces.",
+      "parents": [
+        "cand_825f4af9468350c5"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "lead_lag_beta",
+            "feature_slice": [
+              29,
+              158
+            ],
+            "params": {
+              "window": 12
+            }
+          },
+          {
+            "family": "semivar_ratio",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 16
+            }
+          },
+          {
+            "family": "path_efficiency",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 14
+            }
+          }
+        ],
+        "weights": [
+          1.2,
+          1.0,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "symbolic_kbar_volume_plus_momentum",
+      "rationale": "Symbolic KBar-volume product formula plus native momentum primitive at different window scales (10 vs 14) diversifies the kernel across fast and slow horizons.",
+      "parents": [
+        "cand_dddb69d2a3f27821"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "symbolic",
+            "params": {
+              "window": 10
+            },
+            "channels": [
+              {
+                "time_op": "skew",
+                "feature_op": "top_bottom_spread",
+                "window": 10,
+                "feature_slice": [
+                  0,
+                  9
+                ],
+                "interaction": "product",
+                "rhs_slice": [
+                  95,
+                  158
+                ],
+                "rhs_time_op": "std",
+                "rhs_window": 10,
+                "transform": "tanh",
+                "weight": 1.2
+              },
+              {
+                "time_op": "mean",
+                "feature_op": "mean",
+                "window": 10,
+                "feature_slice": [
+                  29,
+                  95
+                ],
+                "interaction": "ratio",
+                "rhs_slice": [
+                  95,
+                  158
+                ],
+                "rhs_time_op": "mean",
+                "rhs_window": 10,
+                "transform": "identity",
+                "weight": 1.0
+              },
+              {
+                "time_op": "autocorr_1",
+                "feature_op": "mean",
+                "window": 8,
+                "feature_slice": [
+                  9,
+                  29
+                ],
+                "interaction": "none",
+                "transform": "abs",
+                "weight": 0.8
+              }
+            ]
+          },
+          {
+            "family": "momentum",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 14
+            }
+          }
+        ],
+        "weights": [
+          1.3,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "vol_price_regime_trend_mix",
+      "rationale": "Vol-price correlation, regime transition, and trend primitives span three state-dependent mechanisms; mix weights emphasize regime transition for state separability.",
+      "parents": [
+        "cand_730c1c3356d36068"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "vol_price_corr",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 12
+            }
+          },
+          {
+            "family": "regime_transition",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 16
+            }
+          },
+          {
+            "family": "trend",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 10
+            }
+          }
+        ],
+        "weights": [
+          1.0,
+          1.3,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "tail_semivar_dispersion_concat",
+      "rationale": "Tail asymmetry, semivariance ratio, and dispersion cover tail, downside, and cross-sectional liquidity mechanisms; concat gives three weakly correlated dimensions.",
+      "parents": [
+        "cand_dddb69d2a3f27821"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "tail_asymmetry",
+            "feature_slice": [
+              0,
+              9
+            ],
+            "params": {
+              "window": 12
+            }
+          },
+          {
+            "family": "semivar_ratio",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 14
+            }
+          },
+          {
+            "family": "dispersion",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 16
+            }
+          }
+        ],
+        "weights": [
+          1.0,
+          1.2,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "symbolic_trend_volume_plus_drawdown",
+      "rationale": "Symbolic trend-volume-leadlag formula plus native drawdown primitive captures momentum, flow, and downside; mix weights favor the symbolic 3-channel part.",
+      "parents": [
+        "cand_a9e1a3f704a1c088"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "symbolic",
+            "params": {
+              "window": 14
+            },
+            "channels": [
+              {
+                "time_op": "slope",
+                "feature_op": "mean",
+                "window": 14,
+                "feature_slice": [
+                  29,
+                  95
+                ],
+                "interaction": "lead_lag_corr",
+                "rhs_slice": [
+                  95,
+                  158
+                ],
+                "rhs_time_op": "mean",
+                "rhs_window": 14,
+                "transform": "tanh",
+                "weight": 1.2
+              },
+              {
+                "time_op": "std",
+                "feature_op": "std",
+                "window": 14,
+                "feature_slice": [
+                  95,
+                  158
+                ],
+                "interaction": "none",
+                "transform": "identity",
+                "weight": 1.0
+              },
+              {
+                "time_op": "semivar_asymmetry",
+                "feature_op": "mean",
+                "window": 10,
+                "feature_slice": [
+                  0,
+                  9
+                ],
+                "interaction": "none",
+                "transform": "sign_sqrt",
+                "weight": 0.9
+              }
+            ]
+          },
+          {
+            "family": "drawdown",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 12
+            }
+          }
+        ],
+        "weights": [
+          1.3,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "momentum_volume_hurst_mix_4",
+      "rationale": "Four-mechanism mix: momentum, volume dispersion, Hurst variance-ratio, and trend. Diverse subspaces and window scales (10, 12, 16, 18) maximize effective rank.",
+      "parents": [
+        "cand_730c1c3356d36068"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "momentum",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "dispersion",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 12
+            }
+          },
+          {
+            "family": "hurst_vr",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 16
+            }
+          },
+          {
+            "family": "trend",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 18
+            }
+          }
+        ],
+        "weights": [
+          1.1,
+          1.0,
+          0.9,
+          0.8
+        ]
+      }
+    }
+  ],
+  "raw_content": "{\n  \"round_analysis\": \"Previous round produced 4 promoted candidates (screen_effect 0.0039-0.0050) but none survived full validation (effects -0.0009 to -0.0029). The strongest screen signals combined (i) momentum/trend slope from [29,95] with (ii) volume/order-flow statistics from [95,158] and (iii) short-horizon KBar morphology from [0,9]. Screened-out candidates reveal that pure single-operator primitives (vol_price_corr, path_efficiency, tail_asymmetry) and overly short windows (4-6) underperformed, while window 10-20 channels with cross-slice interactions (ratio/product/diff) dominated. Strategy for Round 1: (a) reweight toward cross-slice ratio/product interactions that link [29,95] trend with [95,158] volume; (b) use mid-length windows 10-20 to avoid noise; (c) build composites mixing a trend/momentum mechanism, a volume-imbalance mechanism, and a volatility-regime mechanism; (d) explicitly evolve parents cand_a9e1a3f704a1c088 (ema_diff trend) and cand_730c1c3356d36068 (slope/ratio) by refining window scales and adding lead_lag_corr / beta interactions across the price-volume boundary.\",\n  \"proposals\": [\n    {\n      \"kind\": \"statistical\",\n      \"name\": \"trend_volume_ratio_triplet\",\n      \"rationale\": \"Momentum slope in [29,95] normalized by volume volatility in [95,158] captures informed-trading persistence; adding KBar body symmetry gives a slow/fast regime separator.\",\n      \"parents\": [\"cand_a9e1a3f704a1c088\"],\n      \"descriptor\": {\n        \"family\": \"symbolic\",\n        \"params\": {\"window\": 15},\n        \"channels\": [\n          {\"time_op\": \"slope\", \"feature_op\": \"mean\", \"window\": 15, \"feature_slice\": [29, 95], \"interaction\": \"ratio\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"std\", \"rhs_window\": 15, \"transform\": \"tanh\", \"weight\": 1.3},\n          {\"time_op\": \"ema_diff\", \"feature_op\": \"mean\", \"window\": 12, \"feature_slice\": [29, 95], \"interaction\": \"diff\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"mean\", \"rhs_window\": 12, \"transform\": \"identity\", \"weight\": 1.0},\n          {\"time_op\": \"semivar_asymmetry\", \"feature_op\": \"mean\", \"window\": 10, \"feature_slice\": [0, 9], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.8}\n        ]\n      }\n    },\n    {\n      \"kind\": \"statistical\",\n      \"name\": \"lead_lag_price_volume_beta\",\n      \"rationale\": \"Lead-lag correlation between price momentum and lagged volume imbalance identifies informed order flow; beta interaction captures sensitivity of returns to volume shocks.\",\n      \"parents\": [\"cand_825f4af9468350c5\"],\n      \"descriptor\": {\n        \"family\": \"symbolic\",\n        \"params\": {\"window\": 14},\n        \"channels\": [\n          {\"time_op\": \"mean\", \"feature_op\": \"mean\", \"window\": 14, \"feature_slice\": [29, 95], \"interaction\": \"lead_lag_corr\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"mean\", \"rhs_window\": 14, \"transform\": \"tanh\", \"weight\": 1.2},\n          {\"time_op\": \"std\", \"feature_op\": \"std\", \"window\": 14, \"feature_slice\": [95, 158], \"interaction\": \"beta\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"mean\", \"rhs_window\": 14, \"transform\": \"identity\", \"weight\": 1.0},\n          {\"time_op\": \"autocorr_1\", \"feature_op\": \"mean\", \"window\": 10, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.8}\n        ]\n      }\n    },\n    {\n      \"kind\": \"statistical\",\n      \"name\": \"path_efficiency_volume_regime\",\n      \"rationale\": \"Path efficiency of trend channels plus volume-weighted volatility separates clean directional moves from choppy mean-reverting regimes, aligning IC sign consistently.\",\n      \"parents\": [\"cand_730c1c3356d36068\"],\n      \"descriptor\": {\n        \"family\": \"symbolic\",\n        \"params\": {\"window\": 16},\n        \"channels\": [\n          {\"time_op\": \"path_efficiency\", \"feature_op\": \"l2_norm\", \"window\": 16, \"feature_slice\": [29, 95], \"interaction\": \"ratio\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"std\", \"rhs_window\": 16, \"transform\": \"identity\", \"weight\": 1.2},\n          {\"time_op\": \"hurst_proxy\", \"feature_op\": \"mean\", \"window\": 16, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"tanh\", \"weight\": 1.0},\n          {\"time_op\": \"q_spread\", \"feature_op\": \"iqr\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}\n        ]\n      }\n    },\n    {\n      \"kind\": \"statistical\",\n      \"name\": \"kbar_skew_trend_product\",\n      \"rationale\": \"KBar skewness (intraday rejection) multiplied by trend strength in [29,95] captures reversal-vs-continuation asymmetry; volume std anchors the scale.\",\n      \"parents\": [\"cand_dddb69d2a3f27821\"],\n      \"descriptor\": {\n        \"family\": \"symbolic\",\n        \"params\": {\"window\": 12},\n        \"channels\": [\n          {\"time_op\": \"skew\", \"feature_op\": \"top_bottom_spread\", \"window\": 12, \"feature_slice\": [0, 9], \"interaction\": \"product\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"slope\", \"rhs_window\": 12, \"transform\": \"tanh\", \"weight\": 1.3},\n          {\"time_op\": \"std\", \"feature_op\": \"std\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0},\n          {\"time_op\": \"accel\", \"feature_op\": \"mean\", \"window\": 8, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.8}\n        ]\n      }\n    },\n    {\n      \"kind\": \"statistical\",\n      \"name\": \"semivar_asym_volume_corr\",\n      \"rationale\": \"Semivariance asymmetry in momentum channels combined with price-volume correlation separates downside-volume regimes that dominate CSI300 cross-section.\",\n      \"parents\": [\"cand_730c1c3356d36068\"],\n      \"descriptor\": {\n        \"family\": \"symbolic\",\n        \"params\": {\"window\": 18},\n        \"channels\": [\n          {\"time_op\": \"semivar_asymmetry\", \"feature_op\": \"mean\", \"window\": 18, \"feature_slice\": [29, 95], \"interaction\": \"corr\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"mean\", \"rhs_window\": 18, \"transform\": \"tanh\", \"weight\": 1.2},\n          {\"time_op\": \"max_drawdown\", \"feature_op\": \"l2_norm\", \"window\": 14, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 1.0},\n          {\"time_op\": \"kurt\", \"feature_op\": \"iqr\", \"window\": 14, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}\n        ]\n      }\n    },\n    {\n      \"kind\": \"statistical\",\n      \"name\": \"ema_diff_volume_ratio_long\",\n      \"rationale\": \"Long-window EMA-diff on price channels scaled by volume std is a normalized momentum shock; the ratio stabilizes cross-sectional ranking across volatility regimes.\",\n      \"parents\": [\"cand_a9e1a3f704a1c088\"],\n      \"descriptor\": {\n        \"family\": \"symbolic\",\n        \"params\": {\"window\": 20},\n        \"channels\": [\n          {\"time_op\": \"ema_diff\", \"feature_op\": \"mean\", \"window\": 20, \"feature_slice\": [29, 95], \"interaction\": \"ratio\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"std\", \"rhs_window\": 20, \"transform\": \"identity\", \"weight\": 1.3},\n          {\"time_op\": \"slope\", \"feature_op\": \"mean\", \"window\": 10, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"tanh\", \"weight\": 1.0},\n          {\"time_op\": \"autocorr_1\", \"feature_op\": \"std\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 0.9}\n        ]\n      }\n    },\n    {\n      \"kind\": \"relational\",\n      \"name\": \"vol_price_corr_trend_beta\",\n      \"rationale\": \"Cross-sectional vol-price correlation primitives were weak alone; conditioning on trend beta in [29,95] yields a signed relational predicate that amplifies residual alignment.\",\n      \"parents\": [\"cand_730c1c3356d36068\"],\n      \"descriptor\": {\n        \"family\": \"symbolic\",\n        \"params\": {\"window\": 15},\n        \"channels\": [\n          {\"time_op\": \"mean\", \"feature_op\": \"mean\", \"window\": 15, \"feature_slice\": [95, 158], \"interaction\": \"corr\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"slope\", \"rhs_window\": 15, \"transform\": \"tanh\", \"weight\": 1.2},\n          {\"time_op\": \"std\", \"feature_op\": \"std\", \"window\": 12, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0},\n          {\"time_op\": \"q_spread\", \"feature_op\": \"top_bottom_spread\", \"window\": 8, \"feature_slice\": [0, 9], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.8}\n        ]\n      }\n    },\n    {\n      \"kind\": \"statistical\",\n      \"name\": \"hurst_volume_lead_lag\",\n      \"rationale\": \"Hurst proxy of trend plus lead-lag correlation with volume identifies persistent informed moves; window 16 balances estimation noise vs. signal.\",\n      \"parents\": [\"cand_730c1c3356d36068\"],\n      \"descriptor\": {\n        \"family\": \"symbolic\",\n        \"params\": {\"window\": 16},\n        \"channels\": [\n          {\"time_op\": \"hurst_proxy\", \"feature_op\": \"mean\", \"window\": 16, \"feature_slice\": [29, 95], \"interaction\": \"lead_lag_corr\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"mean\", \"rhs_window\": 16, \"transform\": \"tanh\", \"weight\": 1.2},\n          {\"time_op\": \"std\", \"feature_op\": \"std\", \"window\": 16, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0},\n          {\"time_op\": \"path_efficiency\", \"feature_op\": \"mean\", \"window\": 12, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.8}\n        ]\n      }\n    },\n    {\n      \"kind\": \"statistical\",\n      \"name\": \"momentum_kbar_ratio_short\",\n      \"rationale\": \"Short-horizon momentum in [29,95] ratio to KBar range isolates intraday-vs-multi-day divergence, a known reversal signal in A-shares.\",\n      \"parents\": [\"cand_dddb69d2a3f27821\"],\n      \"descriptor\": {\n        \"family\": \"symbolic\",\n        \"params\": {\"window\": 10},\n        \"channels\": [\n          {\"time_op\": \"mean\", \"feature_op\": \"mean\", \"window\": 10, \"feature_slice\": [29, 95], \"interaction\": \"ratio\", \"rhs_slice\": [0, 9], \"rhs_time_op\": \"std\", \"rhs_window\": 10, \"transform\": \"tanh\", \"weight\": 1.2},\n          {\"time_op\": \"ema_diff\", \"feature_op\": \"mean\", \"window\": 8, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0},\n          {\"time_op\": \"skew\", \"feature_op\": \"std\", \"window\": 10, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"tanh\", \"weight\": 0.9}\n        ]\n      }\n    },\n    {\n      \"kind\": \"statistical\",\n      \"name\": \"volume_skew_trend_diff\",\n      \"rationale\": \"Difference between volume skewness and trend EMA-diff captures divergence between order-flow crowding and price direction, a robust residual-alignment predicate.\",\n      \"parents\": [\"cand_a9e1a3f704a1c088\"],\n      \"descriptor\": {\n        \"family\": \"symbolic\",\n        \"params\": {\"window\": 14},\n        \"channels\": [\n          {\"time_op\": \"skew\", \"feature_op\": \"mean\", \"window\": 14, \"feature_slice\": [95, 158], \"interaction\": \"diff\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"ema_diff\", \"rhs_window\": 14, \"transform\": \"tanh\", \"weight\": 1.3},\n          {\"time_op\": \"std\", \"feature_op\": \"std\", \"window\": 14, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0},\n          {\"time_op\": \"semivar_asymmetry\", \"feature_op\": \"mean\", \"window\": 10, \"feature_slice\": [0, 9], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.8}\n        ]\n      }\n    },\n    {\n      \"kind\": \"statistical\",\n      \"name\": \"regime_transition_volume\",\n      \"rationale\": \"Regime transition in trend channels combined with volume imbalance marks breakout vs fade regimes; product interaction captures the joint signal.\",\n      \"parents\": [\"cand_730c1c3356d36068\"],\n      \"descriptor\": {\n        \"family\": \"symbolic\",\n        \"params\": {\"window\": 18},\n        \"channels\": [\n          {\"time_op\": \"accel\", \"feature_op\": \"mean\", \"window\": 18, \"feature_slice\": [29, 95], \"interaction\": \"product\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"ema_diff\", \"rhs_window\": 18, \"transform\": \"tanh\", \"weight\": 1.2},\n          {\"time_op\": \"hurst_proxy\", \"feature_op\": \"l2_norm\", \"window\": 14, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0},\n          {\"time_op\": \"kurt\", \"feature_op\": \"iqr\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}\n        ]\n      }\n    },\n    {\n      \"kind\": \"statistical\",\n      \"name\": \"trend_qspread_beta_long\",\n      \"rationale\": \"Long-window trend slope with beta to volume IQR captures sensitivity of momentum to liquidity shocks; q_spread of KBar adds microstructure asymmetry.\",\n      \"parents\": [\"cand_a9e1a3f704a1c088\"],\n      \"descriptor\": {\n        \"family\": \"symbolic\",\n        \"params\": {\"window\": 20},\n        \"channels\": [\n          {\"time_op\": \"slope\", \"feature_op\": \"mean\", \"window\": 20, \"feature_slice\": [29, 95], \"interaction\": \"beta\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"q_spread\", \"rhs_window\": 20, \"transform\": \"tanh\", \"weight\": 1.2},\n          {\"time_op\": \"std\", \"feature_op\": \"iqr\", \"window\": 16, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0},\n          {\"time_op\": \"q_spread\", \"feature_op\": \"top_bottom_spread\", \"window\": 8, \"feature_slice\": [0, 9], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.8}\n        ]\n      }\n    },\n    {\n      \"kind\": \"statistical\",\n      \"name\": \"autocorr_volume_momentum\",\n      \"rationale\": \"Autocorrelation of volume channels measures order-flow persistence; interacting with momentum slope via lead_lag_corr gives a clean cross-sectional signal.\",\n      \"parents\": [\"cand_730c1c3356d36068\"],\n      \"descriptor\": {\n        \"family\": \"symbolic\",\n        \"params\": {\"window\": 14},\n        \"channels\": [\n          {\"time_op\": \"autocorr_1\", \"feature_op\": \"mean\", \"window\": 14, \"feature_slice\": [95, 158], \"interaction\": \"lead_lag_corr\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"slope\", \"rhs_window\": 14, \"transform\": \"tanh\", \"weight\": 1.2},\n          {\"time_op\": \"mean\", \"feature_op\": \"mean\", \"window\": 10, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0},\n          {\"time_op\": \"max_drawdown\", \"feature_op\": \"l2_norm\", \"window\": 12, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9}\n        ]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"trend_volume_kbar_mix\",\n      \"rationale\": \"Convex mix of a trend-slope descriptor, a volume-imbalance descriptor, and a KBar morphology descriptor spans three weakly correlated mechanisms yielding high effective rank.\",\n      \"parents\": [\"cand_a9e1a3f704a1c088\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"trend\", \"feature_slice\": [29, 95], \"params\": {\"window\": 15}},\n          {\"family\": \"volatility\", \"feature_slice\": [95, 158], \"params\": {\"window\": 12}},\n          {\"family\": \"tail_asymmetry\", \"feature_slice\": [0, 9], \"params\": {\"window\": 10}}\n        ],\n        \"weights\": [1.3, 1.0, 0.8]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"lead_lag_vol_price_concat\",\n      \"rationale\": \"Concat of lead-lag beta between price and volume with a vol-price correlation primitive and a path-efficiency trend primitive covers three time scales within one kernel.\",\n      \"parents\": [\"cand_825f4af9468350c5\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"lead_lag_beta\", \"feature_slice\": [29, 158], \"params\": {\"window\": 14}},\n          {\"family\": \"vol_price_corr\", \"feature_slice\": [95, 158], \"params\": {\"window\": 12}},\n          {\"family\": \"path_efficiency\", \"feature_slice\": [29, 95], \"params\": {\"window\": 16}}\n        ],\n        \"weights\": [1.2, 1.0, 1.0]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"semivar_momentum_drawdown_mix\",\n      \"rationale\": \"Semivariance asymmetry, momentum, and drawdown primitives are complementary downside/upside mechanisms; mix weights emphasize semivar for A-share skewness.\",\n      \"parents\": [\"cand_dddb69d2a3f27821\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"semivar_ratio\", \"feature_slice\": [29, 95], \"params\": {\"window\": 16}},\n          {\"family\": \"momentum\", \"feature_slice\": [9, 29], \"params\": {\"window\": 10}},\n          {\"family\": \"drawdown\", \"feature_slice\": [95, 158], \"params\": {\"window\": 14}}\n        ],\n        \"weights\": [1.3, 1.0, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"hurst_regime_volume_concat\",\n      \"rationale\": \"Hurst variance-ratio, regime transition, and volume dispersion span long-memory, state-change, and liquidity mechanisms; concat preserves orthogonal subspaces.\",\n      \"parents\": [\"cand_730c1c3356d36068\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"hurst_vr\", \"feature_slice\": [29, 95], \"params\": {\"window\": 18}},\n          {\"family\": \"regime_transition\", \"feature_slice\": [9, 29], \"params\": {\"window\": 12}},\n          {\"family\": \"dispersion\", \"feature_slice\": [95, 158], \"params\": {\"window\": 14}}\n        ],\n        \"weights\": [1.2, 1.0, 1.0]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"symbolic_trend_plus_volume_mix\",\n      \"rationale\": \"Mix of a two-channel symbolic trend/volume formula with a native volatility primitive; multi-scale windows 12 and 18 reduce single-window overfit.\",\n      \"parents\": [\"cand_a9e1a3f704a1c088\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\n            \"family\": \"symbolic\",\n            \"params\": {\"window\": 12},\n            \"channels\": [\n              {\"time_op\": \"slope\", \"feature_op\": \"mean\", \"window\": 12, \"feature_slice\": [29, 95], \"interaction\": \"ratio\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"std\", \"rhs_window\": 12, \"transform\": \"tanh\", \"weight\": 1.2},\n              {\"time_op\": \"semivar_asymmetry\", \"feature_op\": \"mean\", \"window\": 10, \"feature_slice\": [0, 9], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.9},\n              {\"time_op\": \"std\", \"feature_op\": \"std\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0}\n            ]\n          },\n          {\"family\": \"volatility\", \"feature_slice\": [29, 95], \"params\": {\"window\": 18}}\n        ],\n        \"weights\": [1.3, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"kbar_volume_autocorr_concat\",\n      \"rationale\": \"KBar tail asymmetry, volume-price correlation, and autocorrelation span microstructure, order-flow, and persistence; concat yields three diverse kernel dimensions.\",\n      \"parents\": [\"cand_dddb69d2a3f27821\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"tail_asymmetry\", \"feature_slice\": [0, 9], \"params\": {\"window\": 10}},\n          {\"family\": \"vol_price_corr\", \"feature_slice\": [95, 158], \"params\": {\"window\": 14}},\n          {\"family\": \"autocorr\", \"feature_slice\": [9, 29], \"params\": {\"window\": 12}}\n        ],\n        \"weights\": [1.1, 1.2, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"momentum_trend_volume_mix_4\",\n      \"rationale\": \"Four-mechanism mix: momentum, trend, volume dispersion, and drawdown. Four weakly correlated parts maximize effective rank while staying below 4-part limit.\",\n      \"parents\": [\"cand_730c1c3356d36068\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"momentum\", \"feature_slice\": [29, 95], \"params\": {\"window\": 10}},\n          {\"family\": \"trend\", \"feature_slice\": [9, 29], \"params\": {\"window\": 16}},\n          {\"family\": \"dispersion\", \"feature_slice\": [95, 158], \"params\": {\"window\": 12}},\n          {\"family\": \"drawdown\", \"feature_slice\": [29, 95], \"params\": {\"window\": 18}}\n        ],\n        \"weights\": [1.2, 1.0, 0.9, 0.8]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"symbolic_trend_volume_plus_hurst\",\n      \"rationale\": \"Symbolic trend-volume ratio plus native Hurst variance-ratio primitive captures both normalized momentum and long-memory persistence; mix weights favor the symbolic part.\",\n      \"parents\": [\"cand_a9e1a3f704a1c088\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\n            \"family\": \"symbolic\",\n            \"params\": {\"window\": 16},\n            \"channels\": [\n              {\"time_op\": \"ema_diff\", \"feature_op\": \"mean\", \"window\": 16, \"feature_slice\": [29, 95], \"interaction\": \"ratio\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"std\", \"rhs_window\": 16, \"transform\": \"identity\", \"weight\": 1.3},\n              {\"time_op\": \"skew\", \"feature_op\": \"iqr\", \"window\": 12, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.9},\n              {\"time_op\": \"accel\", \"feature_op\": \"mean\", \"window\": 8, \"feature_slice\": [0, 9], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.8}\n            ]\n          },\n          {\"family\": \"hurst_vr\", \"feature_slice\": [29, 95], \"params\": {\"window\": 18}}\n        ],\n        \"weights\": [1.4, 0.8]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"lead_lag_semivar_path_concat\",\n      \"rationale\": \"Lead-lag beta, semivariance ratio, and path efficiency cover directional, downside, and efficiency mechanisms; concat preserves distinct subspaces.\",\n      \"parents\": [\"cand_825f4af9468350c5\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"lead_lag_beta\", \"feature_slice\": [29, 158], \"params\": {\"window\": 12}},\n          {\"family\": \"semivar_ratio\", \"feature_slice\": [29, 95], \"params\": {\"window\": 16}},\n          {\"family\": \"path_efficiency\", \"feature_slice\": [9, 29], \"params\": {\"window\": 14}}\n        ],\n        \"weights\": [1.2, 1.0, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"symbolic_kbar_volume_plus_momentum\",\n      \"rationale\": \"Symbolic KBar-volume product formula plus native momentum primitive at different window scales (10 vs 14) diversifies the kernel across fast and slow horizons.\",\n      \"parents\": [\"cand_dddb69d2a3f27821\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\n            \"family\": \"symbolic\",\n            \"params\": {\"window\": 10},\n            \"channels\": [\n              {\"time_op\": \"skew\", \"feature_op\": \"top_bottom_spread\", \"window\": 10, \"feature_slice\": [0, 9], \"interaction\": \"product\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"std\", \"rhs_window\": 10, \"transform\": \"tanh\", \"weight\": 1.2},\n              {\"time_op\": \"mean\", \"feature_op\": \"mean\", \"window\": 10, \"feature_slice\": [29, 95], \"interaction\": \"ratio\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"mean\", \"rhs_window\": 10, \"transform\": \"identity\", \"weight\": 1.0},\n              {\"time_op\": \"autocorr_1\", \"feature_op\": \"mean\", \"window\": 8, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"abs\", \"weight\": 0.8}\n            ]\n          },\n          {\"family\": \"momentum\", \"feature_slice\": [29, 95], \"params\": {\"window\": 14}}\n        ],\n        \"weights\": [1.3, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"vol_price_regime_trend_mix\",\n      \"rationale\": \"Vol-price correlation, regime transition, and trend primitives span three state-dependent mechanisms; mix weights emphasize regime transition for state separability.\",\n      \"parents\": [\"cand_730c1c3356d36068\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"vol_price_corr\", \"feature_slice\": [95, 158], \"params\": {\"window\": 12}},\n          {\"family\": \"regime_transition\", \"feature_slice\": [29, 95], \"params\": {\"window\": 16}},\n          {\"family\": \"trend\", \"feature_slice\": [9, 29], \"params\": {\"window\": 10}}\n        ],\n        \"weights\": [1.0, 1.3, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"tail_semivar_dispersion_concat\",\n      \"rationale\": \"Tail asymmetry, semivariance ratio, and dispersion cover tail, downside, and cross-sectional liquidity mechanisms; concat gives three weakly correlated dimensions.\",\n      \"parents\": [\"cand_dddb69d2a3f27821\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"tail_asymmetry\", \"feature_slice\": [0, 9], \"params\": {\"window\": 12}},\n          {\"family\": \"semivar_ratio\", \"feature_slice\": [29, 95], \"params\": {\"window\": 14}},\n          {\"family\": \"dispersion\", \"feature_slice\": [95, 158], \"params\": {\"window\": 16}}\n        ],\n        \"weights\": [1.0, 1.2, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"symbolic_trend_volume_plus_drawdown\",\n      \"rationale\": \"Symbolic trend-volume-leadlag formula plus native drawdown primitive captures momentum, flow, and downside; mix weights favor the symbolic 3-channel part.\",\n      \"parents\": [\"cand_a9e1a3f704a1c088\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\n            \"family\": \"symbolic\",\n            \"params\": {\"window\": 14},\n            \"channels\": [\n              {\"time_op\": \"slope\", \"feature_op\": \"mean\", \"window\": 14, \"feature_slice\": [29, 95], \"interaction\": \"lead_lag_corr\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"mean\", \"rhs_window\": 14, \"transform\": \"tanh\", \"weight\": 1.2},\n              {\"time_op\": \"std\", \"feature_op\": \"std\", \"window\": 14, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0},\n              {\"time_op\": \"semivar_asymmetry\", \"feature_op\": \"mean\", \"window\": 10, \"feature_slice\": [0, 9], \"interaction\": \"none\", \"transform\": \"sign_sqrt\", \"weight\": 0.9}\n            ]\n          },\n          {\"family\": \"drawdown\", \"feature_slice\": [9, 29], \"params\": {\"window\": 12}}\n        ],\n        \"weights\": [1.3, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"momentum_volume_hurst_mix_4\",\n      \"rationale\": \"Four-mechanism mix: momentum, volume dispersion, Hurst variance-ratio, and trend. Diverse subspaces and window scales (10, 12, 16, 18) maximize effective rank.\",\n      \"parents\": [\"cand_730c1c3356d36068\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"momentum\", \"feature_slice\": [29, 95], \"params\": {\"window\": 10}},\n          {\"family\": \"dispersion\", \"feature_slice\": [95, 158], \"params\": {\"window\": 12}},\n          {\"family\": \"hurst_vr\", \"feature_slice\": [29, 95], \"params\": {\"window\": 16}},\n          {\"family\": \"trend\", \"feature_slice\": [9, 29], \"params\": {\"window\": 18}}\n        ],\n        \"weights\": [1.1, 1.0, 0.9, 0.8]\n      }\n    }\n  ]\n}",
+  "system_prompt": "You are an autonomous Quantitative Financial AI Scientist in PredicateLab (TSIL domain).\nYour objective is to construct mathematically rigorous relational predicates P(X) for the LUSI (Learning Using Statistical Invariants) loss on the CSI300 daily Alpha158 stock panel:\n    L(y, y_hat) = tau_hat * ||y - y_hat||_I^2 + tau * (y - y_hat)^T P(X) (y - y_hat)\nwhere batch_x has shape [B, T=20, F=158], phi(X) in R^(B x d) is standardized per column and normalized to unit Frobenius norm, and P(X) = phi_hat(X) @ phi_hat(X)^T.\n\nCRITICAL SCIENTIFIC & MATHEMATICAL CONSTRAINTS:\n1. Non-Collapse / High Effective Rank Gate:\n   Every candidate is tested on a real CSI300 batch before training. If participation-ratio effective rank r_eff(P) = (tr(P))^2 / ||P||_F^2 < 1.25 or off-diagonal cosine alignment with 11^T/B > 0.98, the kernel collapses to the trivial global shrinkage control (`control:ones`) and is REJECTED.\n   Therefore, design descriptors with d >= 3 diverse, weakly correlated dimensions!\n2. Beat Both MSE Baseline and `control:ones`:\n   A candidate is only validated if paired Delta_IC > min_effect, its 95% block-bootstrap CI lower bound > 0, AND it outperforms `control:ones`.\n3. Alpha158 Feature Subspace Map (feature_dim=158, valid slice [start, end] with 0 <= start < end <= 158 and end - start >= 2):\n   - [0, 9]: KBar intraday candlestick morphology (body, upper/lower shadow, shift)\n   - [9, 29]: Raw price/VWAP channels across short lags\n   - [29, 95]: Rolling return, momentum, trend R^2, volatility, skewness, rank, support/resistance\n   - [95, 158]: Volume, order-flow imbalance, volume-weighted volatility, price-volume correlation\n\nALLOWED DESCRIPTOR SCHEMAS (Pure JSON data, no Python code):\n\nSchema A — Novel LLM-Constructed Symbolic Tensor Predicate (`family: \"symbolic\"`, `kind: \"statistical\" | \"relational\" | \"soft\"`):\n{\n  \"kind\": \"statistical\",\n  \"name\": \"concise descriptive name\",\n  \"rationale\": \"financial & statistical hypothesis explaining why this kernel aligns residuals\",\n  \"parents\": [\"optional_parent_candidate_id\"],\n  \"descriptor\": {\n    \"family\": \"symbolic\",\n    \"params\": {\"window\": 12},\n    \"channels\": [\n      {\n        \"time_op\": \"one of: mean|std|slope|accel|ema_diff|max_drawdown|semivar_asymmetry|skew|kurt|q_spread|autocorr_1|hurst_proxy|path_efficiency\",\n        \"feature_op\": \"one of: mean|std|max|min|iqr|l2_norm|top_bottom_spread|corr_half\",\n        \"window\": 10,\n        \"feature_slice\": [29, 95],\n        \"interaction\": \"one of: none|diff|ratio|product|corr|beta|lead_lag_corr\",\n        \"rhs_slice\": [95, 158],\n        \"rhs_time_op\": \"optional time_op when interaction in diff|ratio|product\",\n        \"rhs_window\": 15,\n        \"transform\": \"one of: identity|abs|tanh|sign_sqrt\",\n        \"weight\": 1.0\n      }\n      // MUST include between 3 and 6 distinct channel objects in `channels`\n    ]\n  }\n}\n\nSchema B — Atomic Mathematical Operator Predicate (`kind: \"statistical\" | \"soft\" | \"relational\"`):\n- Allowed `family`: \"semivar_ratio\" | \"vol_price_corr\" | \"path_efficiency\" | \"hurst_vr\" | \"lead_lag_beta\" | \"regime_transition\" | \"tail_asymmetry\" | \"momentum\" | \"volatility\" | \"dispersion\" | \"autocorr\" | \"drawdown\" | \"tail\" | \"trend\"\n- `params`: {\"window\": integer in [3, 20]}\n- Optional `feature_slice`: [start, end]\n\nSchema C — DSL-Composed Multi-Mechanism Predicate (`family: \"composite\"`, `kind: \"composite\"`):\n{\n  \"kind\": \"composite\",\n  \"name\": \"concise composite name\",\n  \"rationale\": \"why combining these mechanisms improves cross-sectional IC ranking\",\n  \"parents\": [\"optional_parent_candidate_id\"],\n  \"descriptor\": {\n    \"family\": \"composite\",\n    \"combine\": \"concat\",  // \"concat\" (for DSL/symbolic parts) or \"mix\" (kernel convex combination, required if any part is family=\"native\")\n    \"parts\": [ /* 2 to 4 valid Schema A or Schema B (or native) descriptor dicts */ ],\n    \"weights\": [1.2, 1.0, 0.8]  // positive floats in (0, 10], same length as parts\n  }\n}\n\nMODE DIRECTIVE FOR THIS RUN:\nPropose a balanced 50%/50% portfolio of:\n  (A) NOVEL LLM SYMBOLIC PREDICATES (`family: \"symbolic\"` multi-channel tensor formulas and novel primitives `semivar_ratio`, `vol_price_corr`, `path_efficiency`, `hurst_vr`, `lead_lag_beta`, `regime_transition`, `tail_asymmetry`), AND\n  (B) DSL-COMPOSED PREDICATES (`family: \"composite\"` using `concat` or `mix` over 2..4 complementary sub-descriptors across multiple time scales and Alpha158 subspaces).\n\nReturn strictly a JSON object with keys:\n{\n  \"round_analysis\": \"concise synthesis of empirical evidence and hypothesis strategy for this round\",\n  \"proposals\": [ /* list of 26 candidate objects */ ]\n}",
+  "user_prompt": "Round Index: 1\nTarget Valid Proposals Needed: 20 (please output 26 diverse proposals so we have buffer after deduplication).\nTask Question: Under an identical LSTM, identical folds and an identical training budget, do LLM-constructed predicates (novel symbolic tensor formulas and DSL compositions) improve daily cross-sectional IC relative to plain MSE, the Phi_ones control, and a deterministic rule-based DSL search?\nAlready Evaluated Template Count: 20\n\n=== EMPIRICAL FEEDBACK FROM PREVIOUS DISCOVERY ROUND (Discovery Folds Only) ===\n\n[INSUFFICIENT EVIDENCE (Promoted to Full Validation, Partial/Sub-threshold)] (count=4):\n  - id=cand_825f4af9468350c5 | effect=-0.0008571458929413386 | screen_effect=0.004717096680102788 | stability=None | reason=\n    descriptor={\"family\": \"lead_lag_beta\", \"feature_slice\": [95, 158], \"params\": {\"window\": 8}}\n  - id=cand_730c1c3356d36068 | effect=-0.0017504006207987683 | screen_effect=0.0038957112941661732 | stability=None | reason=\n    descriptor={\"channels\": [{\"feature_op\": \"l2_norm\", \"feature_slice\": [29, 95], \"interaction\": \"none\", \"time_op\": \"path_efficiency\", \"transform\": \"identity\", \"weight\": 1.0, \"window\": 18}, {\"feature_op\": \"mean\", \"feature_slice\": [29, 95], \"interaction\": \"ratio\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"std\", \"rhs_window\": 20, \"time_op\": \"slope\", \"transform\": \"tanh\", \"weight\": 1.2, \"window\": 20}, {\"feature_op\": \"std\", \"feature_slice\": [95, 158], \"interaction\": \"none\", \"time_op\": \"std\", \"transform\": \"abs\", \"weight\": 0.9, \"window\": 15}], \"family\": \"symbolic\", \"params\": {\"window\": 20}}\n  - id=cand_dddb69d2a3f27821 | effect=-0.0018608918142578455 | screen_effect=0.0038660406808520083 | stability=None | reason=\n    descriptor={\"channels\": [{\"feature_op\": \"iqr\", \"feature_slice\": [95, 158], \"interaction\": \"none\", \"time_op\": \"kurt\", \"transform\": \"abs\", \"weight\": 1.0, \"window\": 14}, {\"feature_op\": \"mean\", \"feature_slice\": [29, 95], \"interaction\": \"none\", \"time_op\": \"skew\", \"transform\": \"tanh\", \"weight\": 1.2, \"window\": 14}, {\"feature_op\": \"std\", \"feature_slice\": [9, 29], \"interaction\": \"none\", \"time_op\": \"semivar_asymmetry\", \"transform\": \"identity\", \"weight\": 0.9, \"window\": 10}, {\"feature_op\": \"top_bottom_spread\", \"feature_slice\": [0, 9], \"interaction\": \"none\", \"time_op\": \"q_spread\", \"transform\": \"sign_sqrt\", \"weight\": 0.7, \"window\": 7}], \"family\": \"symbolic\", \"params\": {\"window\": 14}}\n  - id=cand_a9e1a3f704a1c088 | effect=-0.0028924849297481247 | screen_effect=0.005047330909684339 | stability=None | reason=\n    descriptor={\"channels\": [{\"feature_op\": \"mean\", \"feature_slice\": [29, 95], \"interaction\": \"diff\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"ema_diff\", \"rhs_window\": 15, \"time_op\": \"ema_diff\", \"transform\": \"identity\", \"weight\": 1.2, \"window\": 3}, {\"feature_op\": \"std\", \"feature_slice\": [9, 29], \"interaction\": \"none\", \"time_op\": \"std\", \"transform\": \"identity\", \"weight\": 1.0, \"window\": 20}, {\"feature_op\": \"top_bottom_spread\", \"feature_slice\": [95, 158], \"interaction\": \"none\", \"time_op\": \"skew\", \"transform\": \"tanh\", \"weight\": 0.9, \"window\": 10}], \"family\": \"symbolic\", \"params\": {\"window\": 20}}\n\n[SCREENED OUT (Evaluated on Screen Fold)] (count=16):\n  - id=cand_eb63b4d3eb2f04b7 | effect=None | screen_effect=0.003379093364848493 | stability=None | reason=\n    descriptor={\"channels\": [{\"feature_op\": \"iqr\", \"feature_slice\": [95, 158], \"interaction\": \"none\", \"time_op\": \"kurt\", \"transform\": \"abs\", \"weight\": 0.9, \"window\": 15}, {\"feature_op\": \"mean\", \"feature_slice\": [29, 95], \"interaction\": \"none\", \"time_op\": \"hurst_proxy\", \"transform\": \"tanh\", \"weight\": 1.0, \"window\": 20}, {\"feature_op\": \"mean\", \"feature_slice\": [9, 29], \"interaction\": \"none\", \"time_op\": \"accel\", \"transform\": \"sign_sqrt\", \"weight\": 0.7, \"window\": 10}, {\"feature_op\": \"std\", \"feature_slice\": [29, 95], \"interaction\": \"none\", \"time_op\": \"std\", \"transform\": \"identity\", \"weight\": 1.2, \"window\": 18}], \"family\": \"symbolic\", \"params\": {\"window\": 18}}\n  - id=cand_d499c3deb87b39a8 | effect=None | screen_effect=0.0031127219447838685 | stability=None | reason=\n    descriptor={\"channels\": [{\"feature_op\": \"mean\", \"feature_slice\": [29, 95], \"interaction\": \"none\", \"time_op\": \"ema_diff\", \"transform\": \"identity\", \"weight\": 1.0, \"window\": 4}, {\"feature_op\": \"std\", \"feature_slice\": [0, 9], \"interaction\": \"none\", \"time_op\": \"autocorr_1\", \"transform\": \"abs\", \"weight\": 0.8, \"window\": 6}, {\"feature_op\": \"top_bottom_spread\", \"feature_slice\": [9, 29], \"interaction\": \"product\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"std\", \"rhs_window\": 8, \"time_op\": \"mean\", \"transform\": \"tanh\", \"weight\": 1.2, \"window\": 8}], \"family\": \"symbolic\", \"params\": {\"window\": 8}}\n  - id=cand_6c40bbb1605cf94d | effect=None | screen_effect=0.0029937975059266355 | stability=None | reason=\n    descriptor={\"channels\": [{\"feature_op\": \"iqr\", \"feature_slice\": [29, 95], \"interaction\": \"none\", \"time_op\": \"kurt\", \"transform\": \"abs\", \"weight\": 0.8, \"window\": 8}, {\"feature_op\": \"std\", \"feature_slice\": [9, 29], \"interaction\": \"none\", \"time_op\": \"accel\", \"transform\": \"identity\", \"weight\": 1.0, \"window\": 4}, {\"feature_op\": \"top_bottom_spread\", \"feature_slice\": [0, 9], \"interaction\": \"product\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"mean\", \"rhs_window\": 6, \"time_op\": \"mean\", \"transform\": \"tanh\", \"weight\": 1.2, \"window\": 6}], \"family\": \"symbolic\", \"params\": {\"window\": 6}}\n  - id=cand_4afaecfa910886e3 | effect=None | screen_effect=0.0029905793604175176 | stability=None | reason=\n    descriptor={\"family\": \"tail_asymmetry\", \"feature_slice\": [0, 9], \"params\": {\"window\": 6}}\n  - id=cand_b4692865a882a9df | effect=None | screen_effect=0.002988454448124292 | stability=None | reason=\n    descriptor={\"channels\": [{\"feature_op\": \"iqr\", \"feature_slice\": [95, 158], \"interaction\": \"none\", \"time_op\": \"q_spread\", \"transform\": \"abs\", \"weight\": 0.9, \"window\": 10}, {\"feature_op\": \"l2_norm\", \"feature_slice\": [9, 29], \"interaction\": \"none\", \"time_op\": \"path_efficiency\", \"transform\": \"identity\", \"weight\": 1.0, \"window\": 12}, {\"feature_op\": \"mean\", \"feature_slice\": [0, 9], \"interaction\": \"none\", \"time_op\": \"autocorr_1\", \"transform\": \"sign_sqrt\", \"weight\": 0.7, \"window\": 6}, {\"feature_op\": \"mean\", \"feature_slice\": [29, 95], \"interaction\": \"none\", \"time_op\": \"semivar_asymmetry\", \"transform\": \"tanh\", \"weight\": 1.2, \"window\": 14}], \"family\": \"symbolic\", \"params\": {\"window\": 14}}\n  - id=cand_f536d508fa8d5ff2 | effect=None | screen_effect=0.0029615000615657015 | stability=None | reason=\n    descriptor={\"family\": \"vol_price_corr\", \"feature_slice\": [95, 158], \"params\": {\"window\": 10}}\n  - id=cand_69db13707f2f881c | effect=None | screen_effect=0.0026585910519009675 | stability=None | reason=\n    descriptor={\"family\": \"path_efficiency\", \"feature_slice\": [29, 95], \"params\": {\"window\": 15}}\n  - id=cand_14db9b9f0ae1f180 | effect=None | screen_effect=0.002405821146128494 | stability=None | reason=\n    descriptor={\"channels\": [{\"feature_op\": \"l2_norm\", \"feature_slice\": [95, 158], \"interaction\": \"none\", \"time_op\": \"max_drawdown\", \"transform\": \"abs\", \"weight\": 0.9, \"window\": 4}, {\"feature_op\": \"mean\", \"feature_slice\": [9, 29], \"interaction\": \"none\", \"time_op\": \"autocorr_1\", \"transform\": \"identity\", \"weight\": 1.0, \"window\": 6}, {\"feature_op\": \"top_bottom_spread\", \"feature_slice\": [0, 9], \"interaction\": \"ratio\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"std\", \"rhs_window\": 5, \"time_op\": \"skew\", \"transform\": \"tanh\", \"weight\": 1.1, \"window\": 5}], \"family\": \"symbolic\", \"params\": {\"window\": 5}}\n\nINSTRUCTIONS FOR EVOLUTIONARY ROUND 1:\n1. Analyze which operator families, symbolic channels, lookback windows, and feature slices achieved the highest positive `screen_effect` and full-validation `effect`.\n2. Evolve the top-performing candidates by refining their window scales, isolating informative Alpha158 subspaces ([0,9], [9,29], [29,95], [95,158]), adding cross-channel interactions (`lead_lag_corr`, `beta`, `corr`, `ratio`), or combining complementary winners via `composite` (`concat` or `mix`).\n3. Set `parents` to the `candidate_id`s of the previous-round candidates you are evolving.\n4. Do NOT repeat any descriptor already listed above."
+}

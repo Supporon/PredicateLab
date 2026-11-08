@@ -1,0 +1,5 @@
+[run] run_20261108_110259 domain=tsil snapshot=snap_96cc5fb17be56224 seeds=[2025, 2026]
+[round 0] proposed 20 templates
+[round 0] screen=20 promoted=4 validated=0 rejected=0 insufficient=4 duplicates=0 invalid=0
+run_id=run_20261108_110259
+artifacts=artifacts/tsil_tau_k010/run_20261108_110259

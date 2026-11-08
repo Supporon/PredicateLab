@@ -1,0 +1,39 @@
+{
+  "checks": {
+    "hash_chain": {
+      "errors": [],
+      "n_prediction_files_checked": 46,
+      "n_trial_hashes_checked": 46,
+      "ok": true
+    },
+    "independent_stats": {
+      "errors": [],
+      "max_abs_error": 0.0,
+      "n_evidence_checked": 4,
+      "ok": true
+    },
+    "ledger_chronology": {
+      "errors": [],
+      "frozen_at": null,
+      "max_round_ended_at": "2026-11-08T11:52:11.731305+00:00",
+      "min_confirmation_claimed_at": null,
+      "min_holdout_claimed_at": null,
+      "ok": true
+    },
+    "raw_predictions": {
+      "errors": [],
+      "max_abs_error": 0.0,
+      "n_prediction_tensors_recomputed": 46,
+      "ok": true
+    },
+    "state_legitimacy": {
+      "confirmation_kind": "time_forward",
+      "errors": [],
+      "n_independently_confirmed_checked": 0,
+      "ok": true
+    }
+  },
+  "ok": true,
+  "tolerance": 1e-06,
+  "zero_predicatelab_imports": true
+}

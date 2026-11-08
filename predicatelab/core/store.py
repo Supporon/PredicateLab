@@ -15,9 +15,11 @@ V1.1 guarantees:
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import sqlite3
+import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterable
@@ -32,6 +34,7 @@ from predicatelab.core.holdout import (
     holdout_key as _holdout_key,
     mark_confirmation as _mark_confirmation,
     mark_holdout as _mark_holdout,
+    seed_builtin_exposures,
 )
 from predicatelab.core.identity import sanitise_json, strict_json_dumps
 from predicatelab.core.schema import (
@@ -490,6 +493,8 @@ class StateStore:
         self._conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
 
         self._ledger_conn: sqlite3.Connection | None = None
+        self._ledger_lock_path: Path | None = None
+        self.global_ledger_path: Path | None = None
         ledger_env = os.environ.get("PREDICATELAB_GLOBAL_LEDGER")
         ledger_target: Path | None = None
         if global_ledger_path is not None:
@@ -497,13 +502,50 @@ class StateStore:
         elif ledger_env:
             ledger_target = Path(ledger_env).resolve()
         elif str(self.path) != ":memory:" and self.path.name != ".predicatelab_global_ledger.sqlite":
-            ledger_target = self.path.resolve().parent / ".predicatelab_global_ledger.sqlite"
+            ledger_target = self._resolve_default_ledger_path(self.path)
         if ledger_target is not None and ledger_target != self.path.resolve():
             ledger_target.parent.mkdir(parents=True, exist_ok=True)
+            self.global_ledger_path = ledger_target
+            self._ledger_lock_path = ledger_target.with_suffix(".lock")
             self._ledger_conn = sqlite3.connect(str(ledger_target), timeout=60.0, isolation_level=None)
             self._ledger_conn.row_factory = sqlite3.Row
             self._ledger_conn.execute("PRAGMA journal_mode=WAL")
             self._ledger_conn.executescript(_LEDGER_SCHEMA)
+            tmp_root = Path(tempfile.gettempdir()).resolve()
+            if not str(ledger_target).startswith(str(tmp_root) + os.sep):
+                with self._ledger_lock():
+                    seed_builtin_exposures(self._ledger_conn)
+
+    @staticmethod
+    def _resolve_default_ledger_path(db_path: Path) -> Path:
+        resolved = db_path.resolve()
+        for parent in resolved.parents:
+            # Inside a pytest tmp_path test directory (<pytest-N>/<test_func0>/...):
+            # scope the ledger to the test's own root so all subdirectories within
+            # the same test share one ledger without leaking across tests.
+            if parent.parent.name.startswith("pytest-"):
+                return parent / ".predicatelab_global_ledger.sqlite"
+            # Inside a repository / project root: share one authoritative ledger
+            # across all subdirectories (artifacts_*, runs/*, etc.).
+            if (parent / ".git").exists() or (parent / "pytest.ini").exists():
+                return parent / ".predicatelab_global_ledger.sqlite"
+        return resolved.parent / ".predicatelab_global_ledger.sqlite"
+
+    @contextmanager
+    def _ledger_lock(self):
+        if self._ledger_lock_path is None:
+            yield
+            return
+        self._ledger_lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self._ledger_lock_path, "a+", encoding="utf-8") as fh:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                try:
+                    fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+                except Exception:
+                    pass
 
     # ------------------------------------------------------------------ basics
     def close(self) -> None:
@@ -1245,19 +1287,54 @@ class StateStore:
                     tuple(r[c] for c in cols),
                 )
 
+    @staticmethod
+    def _sync_events(src: sqlite3.Connection, dst: sqlite3.Connection, table: str, actor_col: str) -> None:
+        rows = src.execute(
+            f"SELECT access_id, event, run_id, {actor_col}, note, created_at FROM {table} ORDER BY event_id"
+        ).fetchall()
+        if not rows:
+            return
+        with dst:
+            for r in rows:
+                exists = dst.execute(
+                    f"SELECT 1 FROM {table} WHERE access_id=? AND event=? AND created_at=?",
+                    (r["access_id"], r["event"], r["created_at"]),
+                ).fetchone()
+                if exists is None:
+                    dst.execute(
+                        f"INSERT INTO {table}(access_id, event, run_id, {actor_col}, note, created_at) "
+                        "VALUES (?,?,?,?,?,?)",
+                        (r["access_id"], r["event"], r["run_id"], r[actor_col], r["note"], r["created_at"]),
+                    )
+
     def _sync_ledgers(self) -> None:
         if self._ledger_conn is None:
             return
-        self._sync_table(self._conn, self._ledger_conn, "holdout_access", "holdout_key")
-        self._sync_table(self._ledger_conn, self._conn, "holdout_access", "holdout_key")
-        self._sync_table(self._conn, self._ledger_conn, "confirmation_access", "confirmation_key")
-        self._sync_table(self._ledger_conn, self._conn, "confirmation_access", "confirmation_key")
+        with self._ledger_lock():
+            self._sync_table(self._conn, self._ledger_conn, "holdout_access", "holdout_key")
+            self._sync_table(self._ledger_conn, self._conn, "holdout_access", "holdout_key")
+            self._sync_events(self._conn, self._ledger_conn, "holdout_access_events", "candidate_id")
+            self._sync_events(self._ledger_conn, self._conn, "holdout_access_events", "candidate_id")
+            self._sync_table(self._conn, self._ledger_conn, "confirmation_access", "confirmation_key")
+            self._sync_table(self._ledger_conn, self._conn, "confirmation_access", "confirmation_key")
+            self._sync_events(self._conn, self._ledger_conn, "confirmation_access_events", "family_id")
+            self._sync_events(self._ledger_conn, self._conn, "confirmation_access_events", "family_id")
 
     def _push_ledgers(self) -> None:
         if self._ledger_conn is None:
             return
-        self._sync_table(self._conn, self._ledger_conn, "holdout_access", "holdout_key")
-        self._sync_table(self._conn, self._ledger_conn, "confirmation_access", "confirmation_key")
+        with self._ledger_lock():
+            self._sync_table(self._conn, self._ledger_conn, "holdout_access", "holdout_key")
+            self._sync_events(self._conn, self._ledger_conn, "holdout_access_events", "candidate_id")
+            self._sync_table(self._conn, self._ledger_conn, "confirmation_access", "confirmation_key")
+            self._sync_events(self._conn, self._ledger_conn, "confirmation_access_events", "family_id")
+
+    def seed_historical_exposures(self) -> None:
+        """Explicitly seed built-in historical exposures into both global and local ledgers."""
+        with self._ledger_lock():
+            if self._ledger_conn is not None:
+                seed_builtin_exposures(self._ledger_conn)
+            seed_builtin_exposures(self._conn)
 
     @staticmethod
     def holdout_key(**kwargs: Any) -> str:
@@ -1268,27 +1345,45 @@ class StateStore:
         return _confirmation_key(**kwargs)
 
     def assert_holdout_available(self, **kwargs: Any) -> None:
-        self._sync_ledgers()
+        if self._ledger_conn is not None:
+            with self._ledger_lock():
+                self._sync_table(self._conn, self._ledger_conn, "holdout_access", "holdout_key")
+                _assert_holdout_available(self._ledger_conn, **kwargs)
+                self._sync_table(self._ledger_conn, self._conn, "holdout_access", "holdout_key")
+            return
         _assert_holdout_available(self._conn, **kwargs)
 
     def claim_holdout(self, **kwargs: Any) -> dict[str, Any]:
-        self._sync_ledgers()
-        out = _claim_holdout(self._conn, **kwargs)
-        self._push_ledgers()
-        return out
+        if self._ledger_conn is not None:
+            with self._ledger_lock():
+                self._sync_table(self._conn, self._ledger_conn, "holdout_access", "holdout_key")
+                out = _claim_holdout(self._ledger_conn, **kwargs)
+                self._sync_table(self._ledger_conn, self._conn, "holdout_access", "holdout_key")
+                self._sync_events(self._ledger_conn, self._conn, "holdout_access_events", "candidate_id")
+                return out
+        return _claim_holdout(self._conn, **kwargs)
 
     def mark_holdout(self, access_id: str, status: str, **kwargs: Any) -> None:
-        self._sync_ledgers()
+        if self._ledger_conn is not None:
+            with self._ledger_lock():
+                self._sync_table(self._conn, self._ledger_conn, "holdout_access", "holdout_key")
+                _mark_holdout(self._ledger_conn, access_id, status, **kwargs)
+                self._sync_table(self._ledger_conn, self._conn, "holdout_access", "holdout_key")
+                self._sync_events(self._ledger_conn, self._conn, "holdout_access_events", "candidate_id")
+            return
         _mark_holdout(self._conn, access_id, status, **kwargs)
-        self._push_ledgers()
 
     def record_exploratory_reuse(self, **kwargs: Any) -> str:
         from predicatelab.core.holdout import record_exploratory_reuse
 
-        self._sync_ledgers()
-        out = record_exploratory_reuse(self._conn, **kwargs)
-        self._push_ledgers()
-        return out
+        if self._ledger_conn is not None:
+            with self._ledger_lock():
+                self._sync_table(self._conn, self._ledger_conn, "holdout_access", "holdout_key")
+                out = record_exploratory_reuse(self._ledger_conn, **kwargs)
+                self._sync_table(self._ledger_conn, self._conn, "holdout_access", "holdout_key")
+                self._sync_events(self._ledger_conn, self._conn, "holdout_access_events", "candidate_id")
+                return out
+        return record_exploratory_reuse(self._conn, **kwargs)
 
     def get_holdout_access(self, access_id: str) -> dict[str, Any] | None:
         self._sync_ledgers()
@@ -1306,6 +1401,7 @@ class StateStore:
         return [dict(r) for r in rows]
 
     def holdout_events(self, access_id: str) -> list[dict[str, Any]]:
+        self._sync_ledgers()
         return [dict(r) for r in self._conn.execute(
             "SELECT * FROM holdout_access_events WHERE access_id=? ORDER BY event_id", (access_id,)
         ).fetchall()]
@@ -1315,15 +1411,24 @@ class StateStore:
                 if r["status"] in ACTIVE_STATUSES and r["status"] != "intent"]
 
     def claim_confirmation(self, **kwargs: Any) -> dict[str, Any]:
-        self._sync_ledgers()
-        out = _claim_confirmation(self._conn, **kwargs)
-        self._push_ledgers()
-        return out
+        if self._ledger_conn is not None:
+            with self._ledger_lock():
+                self._sync_table(self._conn, self._ledger_conn, "confirmation_access", "confirmation_key")
+                out = _claim_confirmation(self._ledger_conn, **kwargs)
+                self._sync_table(self._ledger_conn, self._conn, "confirmation_access", "confirmation_key")
+                self._sync_events(self._ledger_conn, self._conn, "confirmation_access_events", "family_id")
+                return out
+        return _claim_confirmation(self._conn, **kwargs)
 
     def mark_confirmation(self, access_id: str, status: str, **kwargs: Any) -> None:
-        self._sync_ledgers()
+        if self._ledger_conn is not None:
+            with self._ledger_lock():
+                self._sync_table(self._conn, self._ledger_conn, "confirmation_access", "confirmation_key")
+                _mark_confirmation(self._ledger_conn, access_id, status, **kwargs)
+                self._sync_table(self._ledger_conn, self._conn, "confirmation_access", "confirmation_key")
+                self._sync_events(self._ledger_conn, self._conn, "confirmation_access_events", "family_id")
+            return
         _mark_confirmation(self._conn, access_id, status, **kwargs)
-        self._push_ledgers()
 
     def list_confirmation_access(self, confirmation_key: str | None = None) -> list[dict[str, Any]]:
         self._sync_ledgers()

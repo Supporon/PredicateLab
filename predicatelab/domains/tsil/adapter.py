@@ -66,6 +66,43 @@ def _offdiag_stats(p_mat):
             float((off.max() - off.min()).item()))
 
 
+def _kernel_rank_and_ones_alignment(p_mat) -> tuple[float, float]:
+    """Compute participation-ratio effective rank r_eff(P) and off-diagonal alignment with 11^T/B.
+
+    - ``r_eff(P) = (tr(P))^2 / ||P||_F^2 = (sum_i lambda_i)^2 / sum_i lambda_i^2``
+    - ``ones_kernel_alignment``: cosine similarity of strict off-diagonal entries
+      against the constant ones kernel ``11^T / B``.
+    """
+    import math
+    import torch
+
+    p = torch.as_tensor(p_mat, dtype=torch.float32)
+    n = int(p.shape[0])
+    if n < 2 or not bool(torch.isfinite(p).all().item()):
+        return 0.0, 1.0
+    sym_p = 0.5 * (p + p.T)
+    frob_sq = float((sym_p * sym_p).sum().item())
+    trace = float(torch.diagonal(sym_p).sum().item())
+    if frob_sq <= 1e-16 or abs(trace) <= 1e-12:
+        eff_rank = 0.0
+    else:
+        eff_rank = (trace * trace) / frob_sq
+
+    off_mask = ~torch.eye(n, dtype=torch.bool, device=p.device)
+    off = sym_p[off_mask]
+    n_off = int(off.numel())
+    if n_off == 0:
+        return eff_rank, 1.0
+    off_norm = float(torch.linalg.norm(off).item())
+    if off_norm <= 1e-12:
+        # All off-diagonal entries are zero -> orthogonal to ones kernel (or empty)
+        ones_align = 0.0
+    else:
+        ones_align = abs(float(off.sum().item())) / (math.sqrt(float(n_off)) * off_norm)
+        ones_align = min(1.0, max(0.0, ones_align))
+    return float(eff_rank), float(ones_align)
+
+
 class TSILAdapter(DomainAdapter):
     name = "tsil"
 
@@ -280,8 +317,15 @@ class TSILAdapter(DomainAdapter):
             raise dsl.DescriptorError("native descriptors must have kind='native'")
         if family == "composite" and kind != "composite":
             raise dsl.DescriptorError("composite descriptors must have kind='composite'")
-        if family in dsl.OP_PARAMS and kind not in {"soft", "statistical"}:
-            raise dsl.DescriptorError(f"DSL family {family} must be kind 'soft' or 'statistical'")
+        if (family in dsl.OP_PARAMS or family == "symbolic") and kind not in {
+            "soft",
+            "statistical",
+            "relational",
+            "conditional",
+        }:
+            raise dsl.DescriptorError(
+                f"DSL/symbolic family {family} must be kind 'soft', 'statistical', 'relational', or 'conditional'"
+            )
 
     def make_generator(self, config: dict[str, Any], policy: dict[str, Any]) -> CandidateGenerator:
         return _make_generator(config, policy)
@@ -363,12 +407,18 @@ class TSILAdapter(DomainAdapter):
         # Strict off-diagonal mask.  Subtracting the diagonal then taking std
         # mixes the diagonal zeros into the statistic; a constant P could pass.
         off_std, off_abs_max, off_range = _offdiag_stats(p_mat)
+        eff_rank, ones_align = _kernel_rank_and_ones_alignment(p_mat)
         checks["offdiagonal_std"] = off_std
+        checks["offdiag_std"] = off_std
         checks["offdiagonal_abs_max"] = off_abs_max
         checks["offdiagonal_range"] = off_range
-        # Reject both P=0 and a constant P (all off-diagonals equal), which
-        # carries no cross-sectional structure beyond the mean residual.
-        degenerate = (off_abs_max < 1e-8) or (off_range < 1e-6)
+        checks["effective_rank"] = eff_rank
+        checks["ones_kernel_alignment"] = ones_align
+        # Reject P=0, constant P, or near-rank-1 / ones-aligned kernels
+        # (r_eff(P) < 1.25 or ones_kernel_alignment > 0.98), which collapse
+        # to the trivial control:ones global shrinkage kernel.
+        collapsed_rank = (eff_rank < 1.25) or (ones_align > 0.98)
+        degenerate = (off_abs_max < 1e-8) or (off_range < 1e-6) or (off_std < 1e-6) or collapsed_rank
         checks["non_degenerate"] = not degenerate
         trace = float(torch.diagonal(p_mat).sum().item())
         checks["trace"] = trace
@@ -405,7 +455,17 @@ class TSILAdapter(DomainAdapter):
         if not shape_ok or not sym:
             return {"ok": False, "reason": "predicate produced a malformed P matrix", "severity": "invalid", "checks": checks}
         if degenerate:
-            return {"ok": False, "reason": "degenerate predicate: all samples equally similar", "severity": "invalid", "checks": checks}
+            return {
+                "ok": False,
+                "error": "probe kernel collapsed to near-constant / rank-1",
+                "reason": (
+                    f"probe kernel collapsed to near-constant / rank-1 "
+                    f"(effective_rank={eff_rank:.3f}, ones_kernel_alignment={ones_align:.4f}, "
+                    f"offdiag_std={off_std:.3e}; degenerate predicate: all samples equally similar)"
+                ),
+                "severity": "invalid",
+                "checks": checks,
+            }
         if not checks["psd_lambda_le_one"]:
             return {"ok": False,
                     "reason": "P is not PSD with lambda_max <= 1; I-P would not bound the risk",
@@ -512,6 +572,14 @@ class TSILAdapter(DomainAdapter):
             "training": request.training_config,
             "model_config": dict(self.config.get("model", {})),
             "save_predictions": bool(request.save_predictions),
+            # Weights are heavy: mirror the search policy.  Screen/discovery
+            # trials stay weightless unless ``execution.save_models`` is set;
+            # final (holdout) models are kept by default for auditability.
+            "save_model": bool(
+                self.config.get("execution", {}).get("save_models", False)
+                or (request.phase == "final"
+                    and self.config.get("execution", {}).get("save_final_models", True))
+            ),
             "output_dir": request.workdir,
             "gpu": self.config.get("execution", {}).get("gpu", "0"),
             "calendar_path": str(self.provider_uri / "calendars" / "day.txt"),

@@ -139,10 +139,129 @@ def _dataset_phi_type(job: dict) -> str:
     if job["variant"] == "baseline":
         return "mse"
     if job["variant"] == "control":
-        return "ones"
+        ck = str(job.get("control_kind") or "ones").strip()
+        if ck in {"", "ones", "control:ones"}:
+            return "ones"
+        return "external"
     if job["variant"] == "probe":
         return "phi_timestamp"
     return "phi_timestamp" if needs_timestamp(desc) else "external"
+
+
+SUPPORTED_CONTROL_KINDS = {
+    "",
+    "ones",
+    "control:ones",
+    "perm",
+    "control:perm",
+    "random",
+    "control:random",
+    "block_diag",
+    "control:block_diag",
+}
+
+
+def _make_control_phi_fn(
+    control_kind: str,
+    *,
+    seed: int = 2025,
+    descriptor: dict | None = None,
+    tsil_root: str | None = None,
+    seq_len: int = 20,
+    feature_dim: int = 158,
+):
+    """Build the ``phi_fn(batch_x, timestamp_x) -> (I, P)`` for a control variant.
+
+    Supported ``control_kind`` values:
+    - ``ones`` / ``control:ones``: returns ``None`` (uses upstream ``get_ones_I_P``).
+    - ``perm`` / ``control:perm``: computes a non-degenerate multi-feature kernel ``P``
+      (from ``descriptor`` if provided, else the canonical momentum operator) and applies
+      a deterministic row/column permutation ``P_pi = P[pi][:, pi]`` seeded by ``(seed, step)``.
+      This preserves the exact eigenvalue spectrum ``{lambda_i}``, ``tr(P)=1``, and ``||P||_F``
+      while breaking all semantic cross-sample pairings.
+    - ``random`` / ``control:random``: random standardized Gaussian projection kernel ``P``.
+    - ``block_diag`` / ``control:block_diag``: trace-normalized block-diagonal constant kernel.
+    """
+    import torch
+    from predicatelab.domains.tsil.dsl import compile_descriptor
+
+    ck = str(control_kind or "ones").strip()
+    if ck not in SUPPORTED_CONTROL_KINDS:
+        raise ValueError(f"unsupported control_kind: {control_kind!r}")
+    if ck in {"", "ones", "control:ones"}:
+        return None
+
+    step_counter = [0]
+
+    if ck in {"perm", "control:perm"}:
+        base_desc = descriptor if (descriptor and isinstance(descriptor, dict) and descriptor.get("family")) else {
+            "family": "momentum",
+            "params": {"window": min(10, max(3, seq_len // 2))},
+        }
+        base_fn = compile_descriptor(
+            base_desc,
+            tsil_root=tsil_root,
+            seq_len=seq_len,
+            feature_dim=feature_dim,
+        )
+
+        def _perm_phi_fn(batch_x: torch.Tensor, timestamp_x: torch.Tensor | None = None):
+            step = step_counter[0]
+            step_counter[0] = step + 1
+            i_mat, p_mat = base_fn(batch_x, timestamp_x)
+            b = int(p_mat.shape[0])
+            if b < 2:
+                return i_mat, p_mat
+            gen = torch.Generator(device="cpu")
+            gen.manual_seed((int(seed) * 1000003 + step * 9176 + b) & 0x7FFFFFFF)
+            perm = torch.randperm(b, generator=gen)
+            if bool((perm == torch.arange(b)).all().item()):
+                perm = torch.roll(perm, shifts=1)
+            perm_dev = perm.to(device=p_mat.device)
+            p_perm = p_mat.index_select(0, perm_dev).index_select(1, perm_dev)
+            return i_mat, p_perm
+
+        return _perm_phi_fn
+
+    if ck in {"random", "control:random"}:
+        def _random_phi_fn(batch_x: torch.Tensor, timestamp_x: torch.Tensor | None = None):
+            step = step_counter[0]
+            step_counter[0] = step + 1
+            b = int(batch_x.shape[0])
+            dev = batch_x.device
+            dtype = batch_x.dtype
+            i_mat = torch.eye(b, device=dev, dtype=dtype)
+            if b < 2:
+                return i_mat, i_mat
+            gen = torch.Generator(device="cpu")
+            gen.manual_seed((int(seed) * 1000033 + step * 7919 + b) & 0x7FFFFFFF)
+            z = torch.randn((b, 4), generator=gen, dtype=torch.float32).to(device=dev, dtype=dtype)
+            z = (z - z.mean(dim=0, keepdim=True)) / z.std(dim=0, keepdim=True).clamp_min(1e-6)
+            norm = torch.linalg.norm(z).clamp_min(1e-8)
+            z = z / norm
+            return i_mat, z @ z.T
+
+        return _random_phi_fn
+
+    # block_diag / control:block_diag
+    def _block_diag_phi_fn(batch_x: torch.Tensor, timestamp_x: torch.Tensor | None = None):
+        b = int(batch_x.shape[0])
+        dev = batch_x.device
+        dtype = batch_x.dtype
+        i_mat = torch.eye(b, device=dev, dtype=dtype)
+        if b < 2:
+            return i_mat, i_mat
+        n_blocks = min(4, b)
+        p_mat = torch.zeros((b, b), device=dev, dtype=dtype)
+        bounds = torch.linspace(0, b, steps=n_blocks + 1, dtype=torch.long)
+        for idx in range(n_blocks):
+            s, e = int(bounds[idx].item()), int(bounds[idx + 1].item())
+            if e > s:
+                p_mat[s:e, s:e] = 1.0
+        trace = torch.diagonal(p_mat).sum().clamp_min(1e-8)
+        return i_mat, p_mat / trace
+
+    return _block_diag_phi_fn
 
 
 def _build_dataset(job: dict, batch_size: int, shuffle: bool):
@@ -173,6 +292,10 @@ def _date_level(index) -> int | None:
 
     for level in range(index.nlevels):
         if pd.api.types.is_datetime64_any_dtype(index.get_level_values(level)):
+            return level
+    names = getattr(index, "names", None) or []
+    for level, name in enumerate(names):
+        if str(name or "").lower() in {"datetime", "date", "dt"}:
             return level
     return None
 
@@ -218,14 +341,27 @@ def _prediction_metrics(preds) -> tuple[dict, dict]:
     if date_level is None:
         # single index of timestamps
         dates = pd.to_datetime(idx.get_level_values(0))
+        if "instrument" in preds.columns:
+            instruments = np.asarray(preds["instrument"], dtype=str)
+        else:
+            instruments = np.arange(len(idx)).astype(str)
     else:
         dates = pd.to_datetime(idx.get_level_values(date_level))
+        other = [lvl for lvl in range(idx.nlevels) if lvl != date_level]
+        if other:
+            instruments = idx.get_level_values(other[0]).astype(str).values
+        elif "instrument" in preds.columns:
+            instruments = np.asarray(preds["instrument"], dtype=str)
+        else:
+            instruments = np.arange(len(idx)).astype(str)
     df = pd.DataFrame({
         "score": np.asarray(preds["score"], dtype=float),
         "label": np.asarray(preds["label"], dtype=float),
         "dt": dates,
+        "inst": instruments,
     }).replace([np.inf, -np.inf], np.nan).dropna()
     ic, ric, mse, mae = {}, {}, {}, {}
+    by_date_scores: dict[str, pd.Series] = {}
     for dt, g in df.groupby("dt"):
         if len(g) < 3:
             continue
@@ -240,6 +376,7 @@ def _prediction_metrics(preds) -> tuple[dict, dict]:
             ric[key] = b
         mse[key] = float(((g["score"] - g["label"]) ** 2).mean())
         mae[key] = float((g["score"] - g["label"]).abs().mean())
+        by_date_scores[key] = g.groupby("inst")["score"].mean()
 
     def stats(series: dict) -> tuple[float, float, float]:
         if not series:
@@ -252,6 +389,47 @@ def _prediction_metrics(preds) -> tuple[dict, dict]:
 
     ic_mean, ic_std, icir = stats(ic)
     ric_mean, ric_std, ricir = stats(ric)
+
+    sorted_dates = sorted(ic.keys())
+    if len(sorted_dates) >= 2:
+        mid = len(sorted_dates) // 2
+        ic_first_half = float(np.mean([ic[d] for d in sorted_dates[:mid]]))
+        ic_second_half = float(np.mean([ic[d] for d in sorted_dates[mid:]]))
+        subperiod_sign_consistent = bool(
+            (ic_first_half > 0.0 and ic_second_half > 0.0)
+            or (ic_first_half < 0.0 and ic_second_half < 0.0)
+        )
+    elif len(sorted_dates) == 1:
+        ic_first_half = float(ic[sorted_dates[0]])
+        ic_second_half = float(ic[sorted_dates[0]])
+        subperiod_sign_consistent = bool(ic_first_half != 0.0)
+    else:
+        ic_first_half = float("nan")
+        ic_second_half = float("nan")
+        subperiod_sign_consistent = False
+
+    autocorr_list: list[float] = []
+    score_dates = sorted(by_date_scores.keys())
+    for i in range(1, len(score_dates)):
+        s_prev = by_date_scores[score_dates[i - 1]]
+        s_curr = by_date_scores[score_dates[i]]
+        common = s_prev.index.intersection(s_curr.index)
+        if len(common) < 3:
+            continue
+        p0 = s_prev.loc[common]
+        p1 = s_curr.loc[common]
+        if p0.nunique() < 2 or p1.nunique() < 2:
+            continue
+        ac = float(p0.corr(p1, method="spearman"))
+        if np.isfinite(ac):
+            autocorr_list.append(ac)
+    if autocorr_list:
+        pred_rank_autocorr = float(np.mean(autocorr_list))
+    elif ic:
+        pred_rank_autocorr = 0.0
+    else:
+        pred_rank_autocorr = float("nan")
+
     metrics = {
         "ic": ic_mean,
         "ic_std": ic_std,
@@ -262,8 +440,16 @@ def _prediction_metrics(preds) -> tuple[dict, dict]:
         "mse": float(np.mean(list(mse.values()))) if mse else float("nan"),
         "mae": float(np.mean(list(mae.values()))) if mae else float("nan"),
         "n_dates": len(ic),
+        "ic_first_half": ic_first_half,
+        "ic_second_half": ic_second_half,
+        "subperiod_sign_consistent": subperiod_sign_consistent,
+        "pred_rank_autocorr": pred_rank_autocorr,
+        "rank_autocorr": pred_rank_autocorr,
     }
     return metrics, {"ic": ic, "rank_ic": ric, "mse": mse, "mae": mae}
+
+
+_evaluate_frame = _prediction_metrics
 
 
 def run_trial(job: dict) -> dict:
@@ -285,6 +471,15 @@ def run_trial(job: dict) -> dict:
         phi_fn = compile_descriptor(
             descriptor,
             tsil_root=job["tsil_root"],
+            seq_len=int(job["data"]["seq_len"]),
+            feature_dim=int(job["data"].get("feature_dim", 158)),
+        )
+    elif job["variant"] == "control":
+        phi_fn = _make_control_phi_fn(
+            str(job.get("control_kind") or "ones"),
+            seed=seed,
+            descriptor=descriptor,
+            tsil_root=job.get("tsil_root"),
             seq_len=int(job["data"]["seq_len"]),
             feature_dim=int(job["data"].get("feature_dim", 158)),
         )
@@ -353,6 +548,34 @@ def run_trial(job: dict) -> dict:
             "date_max": max(dates) if len(dates) else None,
             "has_label": bool("label" in preds),
         }
+
+    # Trained weights live in their own ``models/`` directory so a snapshot can
+    # include or exclude them without touching predictions or reports.  The
+    # engine only asks for this for full/final trials by default.
+    model_path = ""
+    model_sha = ""
+    if job.get("save_model"):
+        import hashlib
+
+        import torch
+
+        model_dir = Path(job["output_dir"]) / "models"
+        model_dir.mkdir(parents=True, exist_ok=True)
+        model_path = str(model_dir / "model.pt")
+        torch.save({
+            "model": model.model.state_dict(),
+            "model_type": training.get("model_type", "LSTM"),
+            "model_config": model_cfg,
+            "seed": seed,
+            "fold": fold["fold_id"],
+            "descriptor": descriptor,
+        }, model_path)
+        digest = hashlib.sha256()
+        with open(model_path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                digest.update(chunk)
+        model_sha = digest.hexdigest()
+
     identity = job.get("identity") or {}
     return {
         "status": "success",
@@ -361,6 +584,8 @@ def run_trial(job: dict) -> dict:
         "metric_series": series,
         "fitted_params": {},
         "predictions_path": pred_path,
+        "model_path": model_path,
+        "model_sha256": model_sha,
         "prediction_index": pred_index,
         "duration_s": time.time() - t0,
         "error": "",

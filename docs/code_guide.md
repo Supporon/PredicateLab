@@ -310,6 +310,15 @@ generator.propose
 | `probe/<candidate>/...` | 每个探针 | 探针中间产物 |
 | `bundle/`（`export` 输出） | export | 证据副本、预测、`checksums.sha256`、`bundle_manifest.json` |
 
+原始 `artifacts/` 目录把所有类别混在一起，适合本地运行、不适合迁移或提交。
+`predicatelab/core/artifacts.py` 按 `results / logs / figures / models / data /
+code` 分类，并由 `scripts/package_snapshot.py`（或 `cli publish` /
+`cli publish-all`）生成轻量快照：默认只发布 results、logs、figures、code；
+`models`（训练权重）与 `data`（预测、探针、SQLite、manifest）需显式
+`--include-models` / `--include-data`。快照同时写 `MANIFEST.json`、
+`checksums.sha256` 与 `changes/`（git diff/status、配置快照、环境版本）。
+详见 [artifact_layout.md](artifact_layout.md)。
+
 ---
 
 ## 4. 核心模块逐个讲

@@ -105,7 +105,7 @@ def code_version(
     """
     repo = Path(repo_root)
     git_commit = (_run_git(repo, "rev-parse", "HEAD") or "").strip()
-    status = _run_git(repo, "status", "--porcelain=v1") or ""
+    status = _run_git(repo, "status", "--porcelain") or ""
     diff = _run_git(repo, "diff", "HEAD", "--binary") or ""
     tree = _source_tree_digest(repo)
     external: dict[str, str] = {}

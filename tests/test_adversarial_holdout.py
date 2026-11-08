@@ -187,3 +187,120 @@ def test_holdout_key_ignores_study_metadata_but_tracks_data_window(tmp_path):
     assert holdout_key(**base) != holdout_key(**{**base, "test_end": "2025-08-30"})
     assert holdout_key(**base) != holdout_key(**{**base, "label_spec_hash": "l2"})
     assert holdout_key(**base) != holdout_key(**{**base, "data_manifest_hash": "m2"})
+
+
+def test_cross_db_concurrent_claims_have_exactly_one_winner(tmp_path):
+    """P0-2: Two distinct SQLite DB files sharing a global ledger must never both win."""
+    from predicatelab.core.holdout import ConfirmationConsumed
+
+    ledger = tmp_path / "shared_ledger.sqlite"
+    db_a = tmp_path / "subdir_a" / "study_a.sqlite"
+    db_b = tmp_path / "subdir_b" / "study_b.sqlite"
+    StateStore(db_a, global_ledger_path=ledger).close()
+    StateStore(db_b, global_ledger_path=ledger).close()
+
+    holdout_results: list[str] = []
+
+    def attempt_holdout(item: tuple[int, str]) -> None:
+        idx, db_file = item
+        with StateStore(db_file, global_ledger_path=ledger) as store:
+            try:
+                store.claim_holdout(
+                    **_kwargs(
+                        key="cross-db-holdout-key",
+                        run_id=f"run-{idx}",
+                        candidate_id=f"cand-{idx}",
+                        manifest_hash=f"manifest-{idx}",
+                    )
+                )
+                holdout_results.append("won")
+            except HoldoutConsumed:
+                holdout_results.append("blocked")
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(attempt_holdout, [(1, str(db_a)), (2, str(db_b))]))
+
+    assert sorted(holdout_results) == ["blocked", "won"]
+
+    confirm_results: list[str] = []
+
+    def attempt_confirm(item: tuple[int, str]) -> None:
+        idx, db_file = item
+        with StateStore(db_file, global_ledger_path=ledger) as store:
+            res = store.claim_confirmation(
+                key="cross-db-confirm-key",
+                study_id=f"task-{idx}",
+                run_id=f"run-{idx}",
+                family_id=f"fam-{idx}",
+                manifest_hash=f"manifest-{idx}",
+                protocol_hash="protocol-a",
+                snapshot_hash="snapshot-a",
+                dataset_id="dataset-a",
+                label_spec_hash="label-a",
+                fold_id="f_conf",
+                valid_start="2023-01-01",
+                valid_end="2023-12-31",
+            )
+            confirm_results.append("reused" if res.get("reused") else "won")
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(attempt_confirm, [(1, str(db_a)), (2, str(db_b))]))
+
+    assert sorted(confirm_results) == ["reused", "won"]
+
+
+def test_default_ledger_shared_across_subdirectories_and_builtin_csi300_blocked(tmp_path):
+    """P0-2: Stores in nested subdirectories share the root ledger and block pre-consumed CSI300 windows."""
+    db_sub1 = tmp_path / "artifacts" / "study1" / "state.sqlite"
+    db_sub2 = tmp_path / "artifacts_other" / "nested" / "state.sqlite"
+    with StateStore(db_sub1) as s1, StateStore(db_sub2) as s2:
+        assert s1.global_ledger_path == s2.global_ledger_path
+        row = s1.claim_holdout(
+            **_kwargs(
+                key="sub-shared-key",
+                dataset_id="custom-ds",
+                test_start="2026-01-01",
+                test_end="2026-06-30",
+            )
+        )
+        assert row["status"] == "claimed"
+        with pytest.raises(HoldoutConsumed):
+            s2.claim_holdout(
+                **_kwargs(
+                    key="sub-shared-key",
+                    dataset_id="custom-ds",
+                    test_start="2026-01-01",
+                    test_end="2026-06-30",
+                    run_id="run-sub2",
+                    candidate_id="cand-sub2",
+                )
+            )
+        # Historical CSI300 2024-01-01..2025-08-31 holdout is pre-seeded and blocked even in a brand-new DB
+        with pytest.raises(HoldoutConsumed, match="overlaps|already consumed"):
+            s2.claim_holdout(
+                **_kwargs(
+                    key="fresh-csi300-key",
+                    dataset_id="qlib-cn-csi300",
+                    test_start="2024-01-01",
+                    test_end="2025-08-31",
+                    run_id="brand-new-csi300-run",
+                    candidate_id="brand-new-csi300-cand",
+                )
+            )
+        # Historical CSI300 2023-01-01..2023-12-31 confirmation window is pre-seeded and marked reused
+        conf = s2.claim_confirmation(
+            key="fresh-csi300-conf-key",
+            study_id="study-csi",
+            run_id="brand-new-csi300-run",
+            family_id="brand-new-family-id",
+            manifest_hash="brand-new-manifest-hash",
+            protocol_hash="prot-csi",
+            snapshot_hash="snap-csi",
+            dataset_id="qlib-cn-csi300",
+            label_spec_hash="lbl-csi",
+            fold_id="f2023",
+            valid_start="2023-01-01",
+            valid_end="2023-12-31",
+        )
+        assert conf["reused"] is True
+

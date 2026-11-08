@@ -1,0 +1,82 @@
+# Small-sample scenario: hard positive control (thresholded ratio).
+#
+# Labels depend on an upper-quartile threshold on x0/(|x2|+0.1).  The true
+# descriptor family is ratio_threshold(x0, x2, q=0.75), but the maximum
+# achievable Brier improvement is only about 0.044, so even a large n may not
+# confirm.  This config exists to show that a *real* nonlinear signal can still
+# be missed at small n -- the central small-sample caveat.
+run:
+  name: small_sample_ratio
+  domain: small_sample
+  artifacts_dir: artifacts_small_sample
+  db: artifacts_small_sample/ratio.sqlite
+  # Synthetic scenario: keep the one-time confirmation ledger inside the
+  # scenario directory so `rm -rf artifacts_small_sample` fully resets the run.
+  global_ledger_db: artifacts_small_sample/ratio_ledger.sqlite
+  rounds: 2
+  require_confirmation: true
+  warning_acknowledgements: all
+  warning_ack_reason: >-
+    Pre-registered hard-positive small-sample scenario; low power is the
+    phenomenon under study.
+
+seeds: [2025]
+task:
+  title: Small-sample hard positive control (thresholded ratio, n=256)
+  question: Can a real but modest nonlinear effect be confirmed when n is small?
+  hypothesis: The true ratio signal exists but the achievable Brier gain (~0.044) is too small to confirm reliably at this n.
+
+data:
+  generator: signal_ratio_threshold
+  seed: 20261108
+  n_samples: 256
+  n_features: 8
+  signal_strength: 4.0
+  threshold_quantile: 0.75
+  class_balance: 0.5
+  holdout_fraction: 0.25
+  discovery_fraction: 0.65
+  confirmation_mode: independent
+
+training:
+  seed: 2025
+  C: 1.0
+  max_iter: 5000
+
+protocol:
+  cv_splits: 4
+  cv_repeats: 1
+  discovery_repeats: 1
+  confirmation_splits: 3
+
+evaluation:
+  name: small_sample_brier
+  primary_metric: neg_brier
+  direction: higher
+  secondary_metrics: [auc, accuracy, log_loss]
+  paired: true
+  multiple_testing: benjamini-hochberg
+  notes: per-sample paired Brier improvement; i.i.d. samples, nw_lag=0, block bootstrap=1
+
+search:
+  generator: rule
+  save_predictions: true
+  max_candidates_per_round: 24
+  screen_folds: [d0_f0]
+  validation_folds: [d0_f1, d0_f2, d0_f3]
+  full_validation_top_k: 3
+  min_screen_effect: 0.0
+  fdr_alpha: 0.10
+  min_effect: 0.0025
+  min_stability: 0.60
+  min_fold_coverage: 0.75
+  min_seed_agreement: 0.50
+  require_positive_ci: true
+  require_beat_control: true
+  bootstrap_samples: 500
+  bootstrap_block: 1
+  nw_lag: 0
+  seed: 2025
+
+execution:
+  workers: 1

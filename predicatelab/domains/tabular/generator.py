@@ -33,7 +33,10 @@ class TabularRuleGenerator(CandidateGenerator):
         self.feature_names = feature_names
         self.n_features = n_features
         self.direction = direction
-        self.seed_pairs = [(0, 1), (0, 2), (1, 2), (2, 3), (3, 4), (0, 13), (6, 7), (20, 21)]
+        raw_pairs = [(0, 1), (0, 2), (1, 2), (2, 3), (3, 4), (0, 13), (6, 7), (20, 21)]
+        self.seed_pairs = [(a, b) for a, b in raw_pairs if a < n_features and b < n_features]
+        if not self.seed_pairs and n_features >= 2:
+            self.seed_pairs = [(0, 1)]
 
     def _seed_templates(self) -> list[PredicateTemplate]:
         out = []
@@ -44,7 +47,7 @@ class TabularRuleGenerator(CandidateGenerator):
                     {"op": op, "a": a, "b": b},
                     f"pairwise {op} interaction between two measurements",
                 ))
-        for a in (0, 1, 2):
+        for a in range(min(3, self.n_features)):
             out.append(_tpl(KIND["sigmoid"], f"sigmoid({self.feature_names[a]})",
                             {"op": "sigmoid", "a": a, "scale": 1.0},
                             "graded (soft) deviation from the fold-local median"))
@@ -52,9 +55,10 @@ class TabularRuleGenerator(CandidateGenerator):
                             {"op": "threshold", "a": a, "quantile": 0.5},
                             "conditional indicator above the fold-local median"))
         for a, b in ((0, 1), (0, 2), (1, 2)):
-            out.append(_tpl(KIND["interaction"], f"sign_agreement({self.feature_names[a]}, {self.feature_names[b]})",
-                            {"op": "interaction", "a": a, "b": b},
-                            "relational rule: whether two standardised measurements agree in sign"))
+            if a < self.n_features and b < self.n_features:
+                out.append(_tpl(KIND["interaction"], f"sign_agreement({self.feature_names[a]}, {self.feature_names[b]})",
+                                {"op": "interaction", "a": a, "b": b},
+                                "relational rule: whether two standardised measurements agree in sign"))
         return out
 
     def propose(self, *, round_index: int, n: int, feedback: dict | None,
@@ -123,3 +127,88 @@ class TabularRuleGenerator(CandidateGenerator):
             if len(out) >= n:
                 break
         return out
+
+
+class TabularLLMGenerator(CandidateGenerator):
+    """DeepSeek LLM-driven predicate generator for the Tabular domain."""
+
+    def __init__(self, config: dict[str, Any], feature_names: list[str], n_features: int,
+                 direction: str = "higher", gen_cfg: dict[str, Any] | None = None):
+        from pathlib import Path
+        from predicatelab.core.llm import DeepSeekLLMClient
+
+        self.config = config
+        self.feature_names = feature_names
+        self.n_features = n_features
+        self.direction = direction
+        self.client = DeepSeekLLMClient(gen_cfg or config.get("search", {}).get("generator_config", {}))
+        self.fallback = TabularRuleGenerator(config, feature_names, n_features, direction=direction)
+        self.artifacts_dir = Path(config.get("run", {}).get("artifacts_dir", "artifacts"))
+
+    def propose(self, *, round_index: int, n: int, feedback: dict | None,
+                known_template_hashes: set[str]) -> list[PredicateTemplate]:
+        import json
+
+        seen = set(known_template_hashes)
+        out: list[PredicateTemplate] = []
+
+        def add(t: PredicateTemplate) -> None:
+            if t.content_hash in seen or len(out) >= n:
+                return
+            seen.add(t.content_hash)
+            out.append(t)
+
+        f_map = {i: name for i, name in enumerate(self.feature_names[:40])}
+        sys_prompt = (
+            "You are an AI Scientist constructing tabular feature predicates for PredicateLab.\n"
+            f"Available features (0..{self.n_features - 1}): {json.dumps(f_map)}\n"
+            "Allowed operators (`descriptor.op`):\n"
+            "- `ratio`, `product`, `difference`: requires integer `a` and `b` (0 <= a != b < n_features), kind='statistical'\n"
+            "- `interaction`: requires integer `a` and `b` (a != b), kind='relational'\n"
+            "- `sigmoid`: requires integer `a` and float `scale` in [0.1, 10.0], kind='soft'\n"
+            "- `threshold`: requires integer `a` and float `quantile` in [0.05, 0.95], kind='conditional'\n"
+            "Return JSON: {\"round_analysis\": \"...\", \"proposals\": [{\"kind\": \"...\", \"name\": \"...\", "
+            "\"rationale\": \"...\", \"parents\": [], \"descriptor\": {...}}]}"
+        )
+        usr_prompt = f"Round {round_index}: Propose {n + 4} candidates. Feedback: {json.dumps(feedback or {})[:3000]}"
+        audit_file = self.artifacts_dir / "llm_proposals" / f"tabular_round_{round_index}.json"
+        res = self.client.chat_proposals(system_prompt=sys_prompt, user_prompt=usr_prompt, audit_path=audit_file)
+        if res.ok and res.proposals:
+            for row in res.proposals:
+                desc = row.get("descriptor")
+                if not isinstance(desc, dict):
+                    continue
+                op = str(desc.get("op") or "")
+                if op not in KIND:
+                    continue
+                try:
+                    a = int(desc.get("a", 0))
+                    if not (0 <= a < self.n_features):
+                        continue
+                    clean_desc: dict[str, Any] = {"op": op, "a": a}
+                    if op in {"ratio", "product", "difference", "interaction"}:
+                        b = int(desc.get("b", (a + 1) % self.n_features))
+                        if not (0 <= b < self.n_features) or a == b:
+                            continue
+                        clean_desc["b"] = b
+                    elif op == "sigmoid":
+                        clean_desc["scale"] = max(0.1, min(10.0, float(desc.get("scale", 1.0))))
+                    elif op == "threshold":
+                        clean_desc["quantile"] = max(0.05, min(0.95, float(desc.get("quantile", 0.5))))
+                    add(_tpl(
+                        KIND[op],
+                        str(row.get("name") or f"LLM {op}({a})"),
+                        clean_desc,
+                        str(row.get("rationale") or "LLM tabular hypothesis"),
+                        generator=f"llm_deepseek:{res.model}",
+                        parents=[str(p) for p in (row.get("parents") or []) if p],
+                    ))
+                except Exception:
+                    continue
+
+        if len(out) < n:
+            for t in self.fallback.propose(round_index=round_index, n=n - len(out),
+                                           feedback=feedback, known_template_hashes=seen):
+                add(t)
+        return out
+

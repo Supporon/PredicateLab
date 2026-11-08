@@ -1,0 +1,52 @@
+====================================================================================================
+LUSI kernel-weight (tau) sweep — pre-registered analysis
+====================================================================================================
+
+[0] runtime tau actually used by the candidate trials
+    k005     fixed/fixed=0.95×36  | tau_hat first-eval 0.9500 -> last-eval 0.9500 (per-candidate means)
+    k010     fixed/fixed=0.9×36  | tau_hat first-eval 0.9000 -> last-eval 0.9000 (per-candidate means)
+    k020     fixed/fixed=0.8×36  | tau_hat first-eval 0.8000 -> last-eval 0.8000 (per-candidate means)
+    k050     fixed/fixed=0.5×36  | tau_hat first-eval 0.5000 -> last-eval 0.5000 (per-candidate means)
+    learned  learned/fixed=0.5×36  | tau_hat first-eval 0.2036 -> last-eval 0.4339 (per-candidate means)
+
+[1] per-arm result (promoted candidates only)
+arm       kernel   n  valid  mean_eff  best_eff  mean_stab   min_q  controlIC_f2020    f2021
+--------------------------------------------------------------------------------------------
+k005        0.05   4      0   -0.0024   -0.0014      +0.31  +0.496          +0.0318  +0.0229
+k010        0.10   4      0   -0.0014   -0.0007      +0.56  +0.532          +0.0283  +0.0269
+k020        0.20   4      0   -0.0020   -0.0001      +0.44  +0.471          +0.0287  +0.0243
+k050        0.50   4      0   -0.0025   -0.0017      +0.31  +0.442          +0.0306  +0.0277
+learned    learn   4      0   -0.0019   -0.0014      +0.38  +0.537          +0.0330  +0.0270
+
+[2] paired effect (candidate - baseline:mse) per candidate
+    candidates evaluated: 14   (identical bank in every arm)
+    candidate                   k005      k010      k020      k050   learned
+    cand_1ccf1124814fd023          -         -         -         -   -0.0014
+    cand_2e22fedaf733b09e          -         -   -0.0026         -         -
+    cand_344d5916077d28b5    -0.0020         -         -         -         -
+    cand_512f8647c482a4a8          -         -         -         -   -0.0026
+    cand_5565d19eb78e4635          -         -         -   -0.0017         -
+    cand_55ba4829b14d89bd          -         -         -   -0.0033         -
+    cand_6662d2a74b69d2e2    -0.0014         -         -         -         -
+    cand_71b00c2996c0929b          -   -0.0007         -   -0.0030   -0.0021
+    cand_7839cc5f655ccab1          -   -0.0010   -0.0026         -         -
+    cand_8922705ded22cd4a          -         -   -0.0001         -         -
+    cand_a1924c4cc2d86a81    -0.0032   -0.0028         -   -0.0021         -
+    cand_d36089c083dafc1e          -         -         -         -   -0.0016
+    cand_d907358d81c11d3d          -   -0.0009   -0.0025         -         -
+    cand_f74c0fb7d6f56389    -0.0031         -         -         -         -
+    ARM MEAN                 -0.0024   -0.0014   -0.0020   -0.0025   -0.0019
+
+[4] pre-registered decision
+    kernel 0.05 / 0.10 / 0.20 / 0.50 arm-mean effect: -0.0024 / -0.0014 / -0.0020 / -0.0025
+    spread across kernel weights (0.05..0.50): +0.0012
+    monotone increasing as kernel weight decreases: False
+    validated candidates at kernel <= 0.10: 0; at any kernel: 0
+    VERDICT: INTERMEDIATE — no validated candidate in any arm, but the effect spread (+0.0012) exceeds the pre-registered flatness bound 0.001: report as-is, do not re-gate.
+
+[5] learned arm tau_hat trajectory (secondary prediction: collapse to 0)
+    candidates with a trajectory: 36; epochs logged: 5
+    mean tau_hat at first eval = 0.4339, at last eval = 0.2036, min over all = 0.1004
+    direction: decreasing (supports collapse)
+
+Done.

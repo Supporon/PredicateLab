@@ -63,13 +63,216 @@ OP_PARAMS = {
     "drawdown": {"window": "int"},
     "tail": {"window": "int"},
     "trend": {"window": "int"},
+    "semivar_ratio": {"window": "int"},
+    "vol_price_corr": {"window": "int"},
+    "path_efficiency": {"window": "int"},
+    "hurst_vr": {"window": "int"},
+    "lead_lag_beta": {"window": "int"},
+    "regime_transition": {"window": "int"},
+    "tail_asymmetry": {"window": "int"},
 }
 
-ALLOWED_KEYS = {"family", "params", "feature_slice", "predicate", "parts", "weights", "combine", "note"}
+SYMBOLIC_TIME_OPS = {
+    "mean",
+    "std",
+    "slope",
+    "accel",
+    "ema_diff",
+    "max_drawdown",
+    "semivar_asymmetry",
+    "skew",
+    "kurt",
+    "q_spread",
+    "autocorr_1",
+    "hurst_proxy",
+    "path_efficiency",
+}
+
+SYMBOLIC_FEATURE_OPS = {
+    "mean",
+    "std",
+    "max",
+    "min",
+    "iqr",
+    "l2_norm",
+    "top_bottom_spread",
+    "corr_half",
+}
+
+SYMBOLIC_INTERACTIONS = {
+    "none",
+    "diff",
+    "ratio",
+    "product",
+    "corr",
+    "beta",
+    "lead_lag_corr",
+}
+
+SYMBOLIC_TRANSFORMS = {
+    "identity",
+    "abs",
+    "tanh",
+    "sign_sqrt",
+}
+
+SYMBOLIC_CHANNEL_KEYS = {
+    "time_op",
+    "feature_op",
+    "window",
+    "feature_slice",
+    "interaction",
+    "rhs_slice",
+    "rhs_time_op",
+    "rhs_feature_op",
+    "rhs_window",
+    "transform",
+    "weight",
+    "note",
+}
+
+ALLOWED_KEYS = {
+    "family",
+    "params",
+    "feature_slice",
+    "predicate",
+    "parts",
+    "weights",
+    "combine",
+    "channels",
+    "formula",
+    "note",
+}
 
 
 class DescriptorError(ValueError):
     pass
+
+
+def canonicalize_descriptor(descriptor: dict[str, Any]) -> dict[str, Any]:
+    """Canonicalize a TSIL descriptor so semantically equivalent forms share one hash.
+
+    - Normalizes composite ``parts`` ordering by canonical JSON representation.
+    - Normalizes composite ``weights`` to sum to 1.0 (eliminating global scale factors
+      so ``[1.0, 1.0]`` and ``[2.0, 2.0]`` map to ``[0.5, 0.5]``) and merges identical
+      parts by summing their weights.
+    - Normalizes ``weighted_p`` / ``concat`` aliases into canonical composite form.
+    """
+    from predicatelab.core.hashing import canonical_json
+
+    if not isinstance(descriptor, dict):
+        return descriptor
+    out: dict[str, Any] = {}
+    for k in sorted(descriptor.keys()):
+        v = descriptor[k]
+        if k == "params" and isinstance(v, dict):
+            clean_params: dict[str, Any] = {}
+            for pk in sorted(v.keys()):
+                pv = v[pk]
+                if isinstance(pv, list) and all(isinstance(x, int) and not isinstance(x, bool) for x in pv):
+                    clean_params[pk] = sorted(pv)
+                else:
+                    clean_params[pk] = pv
+            out["params"] = clean_params
+        elif k == "feature_slice" and v is not None and isinstance(v, (list, tuple)) and len(v) == 2:
+            out["feature_slice"] = [int(v[0]), int(v[1])]
+        else:
+            out[k] = v
+
+    family = out.get("family")
+    if family in {"weighted_p", "concat"} and "parts" in out:
+        out["combine"] = "mix" if family == "weighted_p" else "concat"
+        out["family"] = "composite"
+        family = "composite"
+
+    if family == "composite" and isinstance(out.get("parts"), list):
+        raw_parts = [canonicalize_descriptor(p) for p in out["parts"]]
+        combine = out.get("combine", "concat")
+        if combine == "weighted_p":
+            combine = "mix"
+        out["combine"] = combine
+        raw_weights = out.get("weights")
+        if (
+            isinstance(raw_weights, list)
+            and len(raw_weights) == len(raw_parts)
+            and all(isinstance(w, (int, float)) and not isinstance(w, bool) and math.isfinite(float(w)) and float(w) > 0 for w in raw_weights)
+        ):
+            weights = [float(w) for w in raw_weights]
+        else:
+            weights = [1.0] * len(raw_parts)
+
+        # Associative flattening for nested composites with the same combine mode
+        flat_parts: list[dict[str, Any]] = []
+        flat_weights: list[float] = []
+        for part, w in zip(raw_parts, weights):
+            if (
+                isinstance(part, dict)
+                and part.get("family") == "composite"
+                and part.get("combine", "concat") == combine
+                and isinstance(part.get("parts"), list)
+            ):
+                sub_parts = part["parts"]
+                sub_weights = part.get("weights") or [1.0 / max(1, len(sub_parts))] * len(sub_parts)
+                for sp, sw in zip(sub_parts, sub_weights):
+                    flat_parts.append(sp)
+                    flat_weights.append(float(w) * float(sw))
+            else:
+                flat_parts.append(part)
+                flat_weights.append(float(w))
+
+        # Sort parts deterministically by canonical JSON and merge identical parts
+        paired = sorted(
+            zip(flat_parts, flat_weights),
+            key=lambda item: canonical_json(item[0]),
+        )
+        merged_parts: list[dict[str, Any]] = []
+        merged_weights: list[float] = []
+        for part, w in paired:
+            if merged_parts and canonical_json(merged_parts[-1]) == canonical_json(part):
+                merged_weights[-1] += w
+            else:
+                merged_parts.append(part)
+                merged_weights.append(w)
+        if len(merged_parts) == 1:
+            return merged_parts[0]
+        total_w = sum(merged_weights)
+        if total_w > 0:
+            norm_weights = [round(w / total_w, 8) for w in merged_weights]
+        else:
+            norm_weights = [round(1.0 / max(1, len(merged_parts)), 8)] * len(merged_parts)
+        out["parts"] = merged_parts
+        out["weights"] = norm_weights
+    elif family == "symbolic" and isinstance(out.get("channels"), list):
+        norm_channels: list[dict[str, Any]] = []
+        for ch in out["channels"]:
+            if not isinstance(ch, dict):
+                continue
+            c_clean: dict[str, Any] = {}
+            for ck in sorted(ch.keys()):
+                if ck == "note":
+                    continue
+                cv = ch[ck]
+                if ck in {"feature_slice", "rhs_slice"} and cv is not None and isinstance(cv, (list, tuple)) and len(cv) == 2:
+                    c_clean[ck] = [int(cv[0]), int(cv[1])]
+                elif ck in {"window", "rhs_window"} and isinstance(cv, (int, float)) and not isinstance(cv, bool):
+                    c_clean[ck] = int(cv)
+                elif ck == "weight" and isinstance(cv, (int, float)) and not isinstance(cv, bool):
+                    c_clean[ck] = round(float(cv), 6)
+                else:
+                    c_clean[ck] = cv
+            c_clean.setdefault("time_op", "mean")
+            c_clean.setdefault("feature_op", "mean")
+            c_clean.setdefault("interaction", "none")
+            c_clean.setdefault("transform", "identity")
+            norm_channels.append(c_clean)
+        # Deduplicate and sort channels deterministically by canonical JSON
+        dedup_map: dict[str, dict[str, Any]] = {}
+        for c_clean in norm_channels:
+            key = canonical_json(c_clean)
+            if key not in dedup_map:
+                dedup_map[key] = c_clean
+        out["channels"] = [dedup_map[k] for k in sorted(dedup_map.keys())]
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -153,10 +356,61 @@ def validate_descriptor(
             if not all(isinstance(w, (int, float)) and math.isfinite(w) and 0 < w <= 10 for w in weights):
                 raise DescriptorError("composite weights must be finite and in (0, 10]")
         combine = descriptor.get("combine", "concat")
-        if combine not in {"concat", "mix"}:
-            raise DescriptorError("combine must be 'concat' or 'mix'")
+        if combine not in {"concat", "mix", "weighted_p"}:
+            raise DescriptorError("combine must be 'concat', 'mix', or 'weighted_p'")
         if combine == "concat" and any(p.get("family") == "native" for p in parts):
             raise DescriptorError("concat composites support DSL families only; use combine='mix' for native parts")
+        return
+
+    if family == "symbolic":
+        channels = descriptor.get("channels")
+        if not isinstance(channels, list) or not (2 <= len(channels) <= 8):
+            raise DescriptorError("symbolic descriptor requires 'channels' list of length 2..8")
+        if "window" in params:
+            _require_int(params["window"], "params.window", 3, max(3, seq_len))
+        for idx, ch in enumerate(channels):
+            if not isinstance(ch, dict):
+                raise DescriptorError(f"symbolic channel[{idx}] must be an object")
+            unknown_ck = set(ch) - SYMBOLIC_CHANNEL_KEYS
+            if unknown_ck:
+                raise DescriptorError(f"symbolic channel[{idx}] has unknown keys: {sorted(unknown_ck)}")
+            t_op = ch.get("time_op", "mean")
+            if t_op not in SYMBOLIC_TIME_OPS:
+                raise DescriptorError(f"symbolic channel[{idx}] unknown time_op {t_op!r}")
+            f_op = ch.get("feature_op", "mean")
+            if f_op not in SYMBOLIC_FEATURE_OPS:
+                raise DescriptorError(f"symbolic channel[{idx}] unknown feature_op {f_op!r}")
+            inter = ch.get("interaction", "none")
+            if inter not in SYMBOLIC_INTERACTIONS:
+                raise DescriptorError(f"symbolic channel[{idx}] unknown interaction {inter!r}")
+            trans = ch.get("transform", "identity")
+            if trans not in SYMBOLIC_TRANSFORMS:
+                raise DescriptorError(f"symbolic channel[{idx}] unknown transform {trans!r}")
+            if "window" in ch and ch["window"] is not None:
+                _require_int(ch["window"], f"channel[{idx}].window", 3, max(3, seq_len))
+            if "rhs_window" in ch and ch["rhs_window"] is not None:
+                _require_int(ch["rhs_window"], f"channel[{idx}].rhs_window", 3, max(3, seq_len))
+            if "rhs_time_op" in ch and ch["rhs_time_op"] is not None:
+                if ch["rhs_time_op"] not in SYMBOLIC_TIME_OPS:
+                    raise DescriptorError(f"symbolic channel[{idx}] unknown rhs_time_op {ch['rhs_time_op']!r}")
+            if "rhs_feature_op" in ch and ch["rhs_feature_op"] is not None:
+                if ch["rhs_feature_op"] not in SYMBOLIC_FEATURE_OPS:
+                    raise DescriptorError(f"symbolic channel[{idx}] unknown rhs_feature_op {ch['rhs_feature_op']!r}")
+            for s_key in ("feature_slice", "rhs_slice"):
+                cfs = ch.get(s_key)
+                if cfs is not None:
+                    if (
+                        not isinstance(cfs, (list, tuple))
+                        or len(cfs) != 2
+                        or not all(isinstance(v, int) and not isinstance(v, bool) for v in cfs)
+                    ):
+                        raise DescriptorError(f"channel[{idx}].{s_key} must be [start, end] integers")
+                    if cfs[0] < 0 or cfs[1] - cfs[0] < 2:
+                        raise DescriptorError(f"channel[{idx}].{s_key} {cfs} must span at least 2 features")
+                    if feature_dim is not None and cfs[1] > feature_dim:
+                        raise DescriptorError(
+                            f"channel[{idx}].{s_key} end {cfs[1]} exceeds feature_dim {feature_dim}"
+                        )
         return
 
     if family not in OP_PARAMS:
@@ -201,6 +455,178 @@ def _slope(series: torch.Tensor) -> torch.Tensor:
     tt = tt - tt.mean()
     denom = (tt * tt).sum().clamp_min(1e-8)
     return (series * tt).sum(dim=1) / denom
+
+
+def _slope_3d(xw: torch.Tensor) -> torch.Tensor:
+    """Least-squares slope along time (dim=1) for 3D tensor [B, k, F] -> [B, F]."""
+    _, t, _ = xw.shape
+    tt = torch.linspace(0.0, 1.0, t, device=xw.device, dtype=xw.dtype)
+    tt = tt - tt.mean()
+    denom = (tt * tt).sum().clamp_min(1e-8)
+    return (xw * tt[None, :, None]).sum(dim=1) / denom
+
+
+def _symbolic_time_reduce(xw: torch.Tensor, time_op: str) -> torch.Tensor:
+    """Reduce [B, k, F] along time (dim=1) to [B, F]."""
+    k = int(xw.shape[1])
+    if time_op == "mean":
+        return xw.mean(dim=1)
+    if time_op == "std":
+        return xw.std(dim=1)
+    if time_op == "slope":
+        return _slope_3d(xw)
+    if time_op == "accel":
+        if k < 4:
+            return _slope_3d(xw)
+        mid = max(2, k // 2)
+        return _slope_3d(xw[:, mid:, :]) - _slope_3d(xw[:, :mid, :])
+    if time_op == "ema_diff":
+        w = torch.exp(torch.linspace(-1.5, 0.0, k, device=xw.device, dtype=xw.dtype))
+        w = w / w.sum().clamp_min(1e-8)
+        ema = (xw * w[None, :, None]).sum(dim=1)
+        return ema - xw.mean(dim=1)
+    if time_op == "max_drawdown":
+        cum = torch.cumsum(xw, dim=1)
+        rmax = torch.cummax(cum, dim=1).values
+        dd = (rmax - cum) / xw.std(dim=1, keepdim=True).clamp_min(1e-6)
+        return dd.amax(dim=1)
+    if time_op == "semivar_asymmetry":
+        xc = xw - xw.mean(dim=1, keepdim=True)
+        up = torch.relu(xc).pow(2).mean(dim=1)
+        dn = torch.relu(-xc).pow(2).mean(dim=1)
+        return (up - dn) / (up + dn + 1e-8)
+    if time_op == "skew":
+        mean = xw.mean(dim=1, keepdim=True)
+        std = xw.std(dim=1, keepdim=True).clamp_min(1e-6)
+        z = (xw - mean) / std
+        return (z ** 3).mean(dim=1)
+    if time_op == "kurt":
+        mean = xw.mean(dim=1, keepdim=True)
+        std = xw.std(dim=1, keepdim=True).clamp_min(1e-6)
+        z = (xw - mean) / std
+        return (z ** 4).mean(dim=1) - 3.0
+    if time_op == "q_spread":
+        q = torch.quantile(xw, torch.tensor([0.15, 0.85], device=xw.device, dtype=xw.dtype), dim=1)
+        std = xw.std(dim=1).clamp_min(1e-6)
+        return (q[1] - q[0]) / std
+    if time_op == "autocorr_1":
+        if k < 3:
+            return xw.mean(dim=1)
+        a = xw[:, 1:, :] - xw[:, 1:, :].mean(dim=1, keepdim=True)
+        c = xw[:, :-1, :] - xw[:, :-1, :].mean(dim=1, keepdim=True)
+        denom = (a.norm(dim=1) * c.norm(dim=1)).clamp_min(1e-8)
+        return (a * c).sum(dim=1) / denom
+    if time_op == "hurst_proxy":
+        if k < 3:
+            return xw.std(dim=1)
+        dx1 = xw[:, 1:, :] - xw[:, :-1, :]
+        dx2 = xw[:, 2:, :] - xw[:, :-2, :]
+        v1 = dx1.var(dim=1, unbiased=False)
+        v2 = dx2.var(dim=1, unbiased=False)
+        return v2 / (2.0 * v1 + 1e-8)
+    if time_op == "path_efficiency":
+        if k < 2:
+            return xw.mean(dim=1).abs()
+        net = (xw[:, -1, :] - xw[:, 0, :]).abs()
+        tot = (xw[:, 1:, :] - xw[:, :-1, :]).abs().sum(dim=1)
+        return net / (tot + 1e-8)
+    raise DescriptorError(f"unknown symbolic time_op {time_op!r}")
+
+
+def _symbolic_feature_reduce(feat_mat: torch.Tensor, feature_op: str) -> torch.Tensor:
+    """Reduce [B, F] across features (dim=1) to [B]."""
+    f_dim = int(feat_mat.shape[1])
+    if feature_op == "mean":
+        return feat_mat.mean(dim=1)
+    if feature_op == "std":
+        return feat_mat.std(dim=1)
+    if feature_op == "max":
+        return feat_mat.amax(dim=1)
+    if feature_op == "min":
+        return feat_mat.amin(dim=1)
+    if feature_op == "iqr":
+        q = torch.quantile(feat_mat, torch.tensor([0.25, 0.75], device=feat_mat.device, dtype=feat_mat.dtype), dim=1)
+        return q[1] - q[0]
+    if feature_op == "l2_norm":
+        return torch.sqrt((feat_mat ** 2).mean(dim=1) + 1e-8)
+    if feature_op == "top_bottom_spread":
+        k_q = max(1, f_dim // 4)
+        sorted_f, _ = torch.sort(feat_mat, dim=1)
+        return sorted_f[:, -k_q:].mean(dim=1) - sorted_f[:, :k_q].mean(dim=1)
+    if feature_op == "corr_half":
+        mid = max(1, f_dim // 2)
+        a = feat_mat[:, :mid]
+        c = feat_mat[:, -mid:]
+        ac = a - a.mean(dim=1, keepdim=True)
+        cc = c - c.mean(dim=1, keepdim=True)
+        denom = (ac.norm(dim=1) * cc.norm(dim=1)).clamp_min(1e-8)
+        return (ac * cc).sum(dim=1) / denom
+    raise DescriptorError(f"unknown symbolic feature_op {feature_op!r}")
+
+
+def _eval_symbolic_channel(x_full: torch.Tensor, ch: dict[str, Any], default_window: int) -> torch.Tensor:
+    """Evaluate one symbolic channel specification on x_full [B, T, F] -> [B]."""
+    fs = ch.get("feature_slice")
+    x_lhs = x_full[:, :, int(fs[0]): int(fs[1])] if fs else x_full
+    w_lhs = int(ch.get("window") or default_window)
+    xw_lhs = _last_window(x_lhs, w_lhs)
+    t_op = ch.get("time_op", "mean")
+    f_op = ch.get("feature_op", "mean")
+    inter = ch.get("interaction", "none")
+
+    lhs_feat = _symbolic_time_reduce(xw_lhs, t_op)
+    lhs_val = _symbolic_feature_reduce(lhs_feat, f_op)
+
+    if inter != "none":
+        rhs_fs = ch.get("rhs_slice")
+        if rhs_fs:
+            x_rhs = x_full[:, :, int(rhs_fs[0]): int(rhs_fs[1])]
+        else:
+            # Default RHS is complementary half of features
+            mid_f = max(2, int(x_full.shape[2]) // 2)
+            x_rhs = x_full[:, :, mid_f:] if not fs or int(fs[0]) < mid_f else x_full[:, :, :mid_f]
+        w_rhs = int(ch.get("rhs_window") or w_lhs)
+        xw_rhs = _last_window(x_rhs, w_rhs)
+        rhs_t_op = ch.get("rhs_time_op") or t_op
+        rhs_f_op = ch.get("rhs_feature_op") or f_op
+
+        if inter in {"diff", "ratio", "product"}:
+            rhs_feat = _symbolic_time_reduce(xw_rhs, rhs_t_op)
+            rhs_val = _symbolic_feature_reduce(rhs_feat, rhs_f_op)
+            if inter == "diff":
+                val = lhs_val - rhs_val
+            elif inter == "ratio":
+                val = (lhs_val - rhs_val) / (lhs_val.abs() + rhs_val.abs() + 1e-6)
+            else:
+                val = lhs_val * rhs_val
+        else:
+            k_common = min(int(xw_lhs.shape[1]), int(xw_rhs.shape[1]))
+            s_lhs = xw_lhs[:, -k_common:, :].mean(dim=2)
+            s_rhs = xw_rhs[:, -k_common:, :].mean(dim=2)
+            if inter == "lead_lag_corr" and k_common >= 3:
+                a = s_lhs[:, 1:] - s_lhs[:, 1:].mean(dim=1, keepdim=True)
+                c = s_rhs[:, :-1] - s_rhs[:, :-1].mean(dim=1, keepdim=True)
+                val = (a * c).sum(dim=1) / (a.norm(dim=1) * c.norm(dim=1) + 1e-8)
+            elif inter == "beta":
+                a = s_lhs - s_lhs.mean(dim=1, keepdim=True)
+                c = s_rhs - s_rhs.mean(dim=1, keepdim=True)
+                val = (a * c).sum(dim=1) / ((c * c).sum(dim=1) + 1e-6)
+            else:  # corr
+                a = s_lhs - s_lhs.mean(dim=1, keepdim=True)
+                c = s_rhs - s_rhs.mean(dim=1, keepdim=True)
+                val = (a * c).sum(dim=1) / (a.norm(dim=1) * c.norm(dim=1) + 1e-8)
+    else:
+        val = lhs_val
+
+    trans = ch.get("transform", "identity")
+    if trans == "abs":
+        val = val.abs()
+    elif trans == "tanh":
+        val = torch.tanh(val)
+    elif trans == "sign_sqrt":
+        val = torch.sign(val) * torch.sqrt(val.abs() + 1e-8)
+    weight = float(ch.get("weight", 1.0))
+    return val * weight
 
 
 def _standardise(phi: torch.Tensor) -> torch.Tensor:
@@ -289,6 +715,167 @@ def raw_phi(descriptor: dict[str, Any], batch_x: torch.Tensor) -> torch.Tensor:
         ss_res = ((m - fitted) ** 2).sum(dim=1)
         ss_tot = ((m - m.mean(dim=1, keepdim=True)) ** 2).sum(dim=1).clamp_min(1e-8)
         return torch.stack([slope, 1.0 - ss_res / ss_tot], dim=1)
+
+    if family == "semivar_ratio":
+        # Upside vs downside semivariance asymmetry across features and time
+        xw_c = xw - xw.mean(dim=1, keepdim=True)
+        up_sq = torch.relu(xw_c).pow(2).mean(dim=1)  # [B, F]
+        dn_sq = torch.relu(-xw_c).pow(2).mean(dim=1)  # [B, F]
+        dn_share = dn_sq / (up_sq + dn_sq + 1e-8)  # [B, F]
+        f1 = dn_share.mean(dim=1)
+        f2 = dn_share.std(dim=1)
+        mc = m - m.mean(dim=1, keepdim=True)
+        up_m = torch.relu(mc).pow(2).mean(dim=1)
+        dn_m = torch.relu(-mc).pow(2).mean(dim=1)
+        f3 = torch.log((up_m + 1e-6) / (dn_m + 1e-6))
+        if xw.shape[1] >= 2:
+            dx = xw[:, 1:, :] - xw[:, :-1, :]
+            dx_up = torch.relu(dx).pow(2).mean(dim=(1, 2))
+            dx_dn = torch.relu(-dx).pow(2).mean(dim=(1, 2))
+            f4 = (dx_up - dx_dn) / (dx_up + dx_dn + 1e-8)
+        else:
+            f4 = f1
+        f5 = (dn_sq.amax(dim=1) - up_sq.amax(dim=1)) / (dn_sq.amax(dim=1) + up_sq.amax(dim=1) + 1e-8)
+        return torch.stack([f1, f2, f3, f4, f5], dim=1)
+
+    if family == "vol_price_corr":
+        # Multi-scale temporal synergy between price-change channels and volume/volatility channels
+        n_feat = int(xw.shape[2])
+        mid_f = max(1, n_feat // 2)
+        p_feat = xw[:, :, :mid_f]
+        v_feat = xw[:, :, mid_f:] if mid_f < n_feat else xw[:, :, :mid_f]
+        p_ser = p_feat.mean(dim=2)  # [B, k]
+        v_ser = v_feat.mean(dim=2)  # [B, k]
+
+        def _row_corr(a: torch.Tensor, c: torch.Tensor) -> torch.Tensor:
+            ac = a - a.mean(dim=1, keepdim=True)
+            cc = c - c.mean(dim=1, keepdim=True)
+            denom = (ac.norm(dim=1) * cc.norm(dim=1)).clamp_min(1e-8)
+            return (ac * cc).sum(dim=1) / denom
+
+        f1 = _row_corr(p_ser, v_ser)
+        k_half = max(2, int(xw.shape[1]) // 2)
+        f2 = _row_corr(p_ser[:, -k_half:], v_ser[:, -k_half:])
+        if xw.shape[1] >= 3:
+            f3 = _row_corr(p_ser[:, 1:], v_ser[:, :-1])
+        else:
+            f3 = f1
+        f4 = _slope(p_ser) - _slope(v_ser)
+        m_ch = min(int(p_feat.shape[2]), int(v_feat.shape[2]))
+        if m_ch >= 2:
+            pc_ch = p_feat[:, :, :m_ch] - p_feat[:, :, :m_ch].mean(dim=1, keepdim=True)
+            vc_ch = v_feat[:, :, :m_ch] - v_feat[:, :, :m_ch].mean(dim=1, keepdim=True)
+            ch_corr = (pc_ch * vc_ch).sum(dim=1) / (pc_ch.norm(dim=1) * vc_ch.norm(dim=1) + 1e-8)
+            f5 = ch_corr.std(dim=1)
+        else:
+            f5 = _slope(p_ser) * _slope(v_ser)
+        return torch.stack([f1, f2, f3, f4, f5], dim=1)
+
+    if family == "path_efficiency":
+        # Kaufman Efficiency Ratio, directional sign persistence, and path curvature
+        if xw.shape[1] >= 2:
+            dx = xw[:, 1:, :] - xw[:, :-1, :]
+            net = (xw[:, -1, :] - xw[:, 0, :]).abs()
+            tot = dx.abs().sum(dim=1).clamp_min(1e-8)
+            er = net / tot  # [B, F]
+            sign_net = torch.sign(xw[:, -1, :] - xw[:, 0, :])
+            dir_persist = (torch.sign(dx) == sign_net[:, None, :]).float().mean(dim=1)
+        else:
+            er = xw.mean(dim=1).abs()
+            dir_persist = torch.ones_like(er)
+        if xw.shape[1] >= 3:
+            ddx = xw[:, 2:, :] - 2.0 * xw[:, 1:-1, :] + xw[:, :-2, :]
+            curv = ddx.std(dim=1) / xw.std(dim=1).clamp_min(1e-6)
+        else:
+            curv = er
+        m_er = (m[:, -1] - m[:, 0]) / (m[:, 1:] - m[:, :-1]).abs().sum(dim=1).clamp_min(1e-8) if m.shape[1] >= 2 else m.mean(dim=1)
+        return torch.stack(
+            [er.mean(dim=1), er.std(dim=1), dir_persist.mean(dim=1), curv.mean(dim=1), m_er],
+            dim=1,
+        )
+
+    if family == "hurst_vr":
+        # Multi-horizon Variance Ratio and scaling exponent profile
+        if xw.shape[1] >= 4:
+            dx1 = xw[:, 1:, :] - xw[:, :-1, :]
+            dx2 = xw[:, 2:, :] - xw[:, :-2, :]
+            dx3 = xw[:, 3:, :] - xw[:, :-3, :]
+            v1 = dx1.var(dim=1, unbiased=False).clamp_min(1e-8)
+            vr2 = dx2.var(dim=1, unbiased=False) / (2.0 * v1)
+            vr3 = dx3.var(dim=1, unbiased=False) / (3.0 * v1)
+            dm1 = (m[:, 1:] - m[:, :-1]).var(dim=1, unbiased=False).clamp_min(1e-8)
+            m_vr2 = (m[:, 2:] - m[:, :-2]).var(dim=1, unbiased=False) / (2.0 * dm1)
+        else:
+            vr2 = xw.std(dim=1)
+            vr3 = vr2
+            m_vr2 = m.std(dim=1)
+        return torch.stack(
+            [vr2.mean(dim=1), vr2.std(dim=1), vr3.mean(dim=1), (vr3 - vr2).mean(dim=1), m_vr2],
+            dim=1,
+        )
+
+    if family == "lead_lag_beta":
+        # Cross-channel lead-lag predictive beta and lag-1 correlation asymmetry
+        n_feat = int(xw.shape[2])
+        mid_f = max(1, n_feat // 2)
+        p_ser = xw[:, :, :mid_f].mean(dim=2)
+        v_ser = xw[:, :, mid_f:].mean(dim=2) if mid_f < n_feat else p_ser
+        if xw.shape[1] >= 3:
+            p_curr = p_ser[:, 1:] - p_ser[:, 1:].mean(dim=1, keepdim=True)
+            v_prev = v_ser[:, :-1] - v_ser[:, :-1].mean(dim=1, keepdim=True)
+            v_curr = v_ser[:, 1:] - v_ser[:, 1:].mean(dim=1, keepdim=True)
+            p_prev = p_ser[:, :-1] - p_ser[:, :-1].mean(dim=1, keepdim=True)
+            corr_v_leads_p = (p_curr * v_prev).sum(dim=1) / (p_curr.norm(dim=1) * v_prev.norm(dim=1) + 1e-8)
+            corr_p_leads_v = (v_curr * p_prev).sum(dim=1) / (v_curr.norm(dim=1) * p_prev.norm(dim=1) + 1e-8)
+            beta_vp = (p_curr * v_prev).sum(dim=1) / ((v_prev * v_prev).sum(dim=1) + 1e-6)
+        else:
+            corr_v_leads_p = _slope(p_ser)
+            corr_p_leads_v = _slope(v_ser)
+            beta_vp = corr_v_leads_p - corr_p_leads_v
+        lead_asym = corr_v_leads_p - corr_p_leads_v
+        ch_disp = (xw[:, :, :mid_f].std(dim=1).mean(dim=1) - xw[:, :, mid_f:].std(dim=1).mean(dim=1)) if mid_f < n_feat else lead_asym
+        return torch.stack([corr_v_leads_p, corr_p_leads_v, lead_asym, beta_vp, ch_disp], dim=1)
+
+    if family == "regime_transition":
+        # Short-vs-prior window regime shift in volatility, slope, and cross-feature dispersion
+        k_len = int(xw.shape[1])
+        mid_t = max(1, k_len // 2)
+        prior = xw[:, :mid_t, :]
+        recent = xw[:, mid_t:, :] if mid_t < k_len else prior
+        vol_prior = prior.std(dim=1).clamp_min(1e-6)
+        vol_recent = recent.std(dim=1).clamp_min(1e-6)
+        log_vol_ratio = torch.log(vol_recent / vol_prior)
+        mean_shift = (recent.mean(dim=1) - prior.mean(dim=1)) / vol_prior
+        disp_shift = recent.std(dim=2).mean(dim=1) - prior.std(dim=2).mean(dim=1)
+        slope_shift = (_slope(m[:, mid_t:]) - _slope(m[:, :mid_t])) if mid_t >= 2 and (k_len - mid_t) >= 2 else _slope(m)
+        return torch.stack(
+            [log_vol_ratio.mean(dim=1), log_vol_ratio.std(dim=1), mean_shift.mean(dim=1), disp_shift, slope_shift],
+            dim=1,
+        )
+
+    if family == "tail_asymmetry":
+        # Upper vs lower tail expected shortfall and extreme excursion asymmetry
+        xc = xw - xw.mean(dim=1, keepdim=True)
+        std = xw.std(dim=1, keepdim=True).clamp_min(1e-6)
+        z = xc / std  # [B, k, F]
+        up_tail = torch.relu(z - 0.8).mean(dim=1)  # [B, F]
+        dn_tail = torch.relu(-z - 0.8).mean(dim=1)  # [B, F]
+        es_asym = (up_tail - dn_tail) / (up_tail + dn_tail + 1e-6)
+        max_gain = z.amax(dim=1)
+        max_loss = (-z).amax(dim=1)
+        excursion_asym = (max_gain - max_loss) / (max_gain + max_loss + 1e-6)
+        m_z = (m - m.mean(dim=1, keepdim=True)) / m.std(dim=1, keepdim=True).clamp_min(1e-6)
+        m_tail = (torch.relu(m_z).pow(3).mean(dim=1) - torch.relu(-m_z).pow(3).mean(dim=1))
+        return torch.stack(
+            [es_asym.mean(dim=1), es_asym.std(dim=1), excursion_asym.mean(dim=1), excursion_asym.std(dim=1), m_tail],
+            dim=1,
+        )
+
+    if family == "symbolic":
+        channels = descriptor.get("channels") or []
+        default_w = _window(descriptor)
+        cols = [_eval_symbolic_channel(x, ch, default_w) for ch in channels]
+        return torch.stack(cols, dim=1)
 
     raise DescriptorError(f"unknown family {family!r}")
 

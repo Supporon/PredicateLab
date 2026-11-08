@@ -1,0 +1,37 @@
+{
+  "calendar_path": "/home/zhengzengrong/.qlib/qlib_data/cn_data/calendars/day.txt",
+  "data": {
+    "calendar_path": "/home/zhengzengrong/.qlib/qlib_data/cn_data/calendars/day.txt",
+    "feature_dim": 158,
+    "horizon": 1,
+    "label": "Ref($close, -2) / Ref($close, -1) - 1",
+    "market": "csi300",
+    "provider_uri": "/home/zhengzengrong/.qlib/qlib_data/cn_data",
+    "seq_len": 20,
+    "tsil_root": "/home/zhengzengrong/PredicateLab/Predicate_Lab_v1.1/TSIL-main"
+  },
+  "descriptor": {},
+  "fold": {
+    "embargo_days": 3,
+    "fold_id": "f2022",
+    "kind": "time",
+    "metadata": {},
+    "notes": "effective train_end=2021-12-29, valid_start=2022-01-07; label isolation trimmed train_end 2021-12-29->2021-12-27 (tail labels need prices at/after valid_start); label isolation trimmed valid_end 2022-12-31->2022-12-28 (2 dates need later prices)",
+    "purge_days": 2,
+    "role": "search",
+    "test_end": null,
+    "test_start": null,
+    "train_end": "2021-12-27",
+    "train_start": "2018-01-01",
+    "valid_end": "2022-12-28",
+    "valid_start": "2022-01-07"
+  },
+  "gpu": null,
+  "mode": "probe_batch",
+  "output_path": "artifacts/tsil_llm_novel_symbolic/_probe_batches/4b8a673e5adb0ec3c40d8fac/f2022.npz",
+  "provider_uri": "/home/zhengzengrong/.qlib/qlib_data/cn_data",
+  "result_path": "artifacts/tsil_llm_novel_symbolic/_probe_batches/4b8a673e5adb0ec3c40d8fac/f2022.result.json",
+  "seed": 2025,
+  "tsil_root": "/home/zhengzengrong/PredicateLab/Predicate_Lab_v1.1/TSIL-main",
+  "variant": "probe"
+}

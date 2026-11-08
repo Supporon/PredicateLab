@@ -1,0 +1,103 @@
+{
+  "experiment": "tsil_tau_k020",
+  "files": [
+    "figures/run_20261108_110259/effects_forest.png",
+    "figures/run_20261108_110259/effects_forest.svg",
+    "figures/run_20261108_110259/ic_series.png",
+    "figures/run_20261108_110259/ic_series.svg",
+    "logs/_probe_batches/4b8a673e5adb0ec3c40d8fac/worker.log",
+    "logs/run_20261108_110259/trials/full/f2020/baseline_mse/baseline/seed_2025/e4d6d8276353/worker.log",
+    "logs/run_20261108_110259/trials/full/f2020/baseline_mse/baseline/seed_2026/cfaac5c95185/worker.log",
+    "logs/run_20261108_110259/trials/full/f2020/cand_2e22fedaf733b09e/candidate/seed_2025/df6de56b7b7c/worker.log",
+    "logs/run_20261108_110259/trials/full/f2020/cand_2e22fedaf733b09e/candidate/seed_2026/905a3788ec52/worker.log",
+    "logs/run_20261108_110259/trials/full/f2020/cand_7839cc5f655ccab1/candidate/seed_2025/13cb2504bd2a/worker.log",
+    "logs/run_20261108_110259/trials/full/f2020/cand_7839cc5f655ccab1/candidate/seed_2026/1cda23a347ee/worker.log",
+    "logs/run_20261108_110259/trials/full/f2020/cand_8922705ded22cd4a/candidate/seed_2025/08f1d8205233/worker.log",
+    "logs/run_20261108_110259/trials/full/f2020/cand_8922705ded22cd4a/candidate/seed_2026/44d97ddc60f9/worker.log",
+    "logs/run_20261108_110259/trials/full/f2020/cand_d907358d81c11d3d/candidate/seed_2025/cbdc3b2cd8af/worker.log",
+    "logs/run_20261108_110259/trials/full/f2020/cand_d907358d81c11d3d/candidate/seed_2026/ff0dc6e1f03e/worker.log",
+    "logs/run_20261108_110259/trials/full/f2020/control_ones/control/seed_2025/416e16519a0a/worker.log",
+    "logs/run_20261108_110259/trials/full/f2020/control_ones/control/seed_2026/e022a6144fff/worker.log",
+    "logs/run_20261108_110259/trials/full/f2021/baseline_mse/baseline/seed_2025/5c9c99268925/worker.log",
+    "logs/run_20261108_110259/trials/full/f2021/baseline_mse/baseline/seed_2026/194dcdef53e2/worker.log",
+    "logs/run_20261108_110259/trials/full/f2021/cand_2e22fedaf733b09e/candidate/seed_2025/b93991f256ef/worker.log",
+    "logs/run_20261108_110259/trials/full/f2021/cand_2e22fedaf733b09e/candidate/seed_2026/914f113bb737/worker.log",
+    "logs/run_20261108_110259/trials/full/f2021/cand_7839cc5f655ccab1/candidate/seed_2025/34b4eb83360b/worker.log",
+    "logs/run_20261108_110259/trials/full/f2021/cand_7839cc5f655ccab1/candidate/seed_2026/ce3c83b41b70/worker.log",
+    "logs/run_20261108_110259/trials/full/f2021/cand_8922705ded22cd4a/candidate/seed_2025/08aa917410bd/worker.log",
+    "logs/run_20261108_110259/trials/full/f2021/cand_8922705ded22cd4a/candidate/seed_2026/57f4a5d980b2/worker.log",
+    "logs/run_20261108_110259/trials/full/f2021/cand_d907358d81c11d3d/candidate/seed_2025/d604e743d441/worker.log",
+    "logs/run_20261108_110259/trials/full/f2021/cand_d907358d81c11d3d/candidate/seed_2026/96a6c0527bcc/worker.log",
+    "logs/run_20261108_110259/trials/full/f2021/control_ones/control/seed_2025/775f756922a1/worker.log",
+    "logs/run_20261108_110259/trials/full/f2021/control_ones/control/seed_2026/aa52f225ad87/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/baseline_mse/baseline/seed_2025/67d4c0e19474/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_16a69968dbe85a7c/candidate/seed_2025/109b054d72f7/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_1ccf1124814fd023/candidate/seed_2025/08b57c888fad/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_2e22fedaf733b09e/candidate/seed_2025/74d521c536c2/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_3007a45eaeb74f27/candidate/seed_2025/b43c2587ae88/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_344d5916077d28b5/candidate/seed_2025/597b99143f54/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_408a3b6351ce435f/candidate/seed_2025/593ef45a7407/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_512f8647c482a4a8/candidate/seed_2025/fc4cd0453b8b/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_5565d19eb78e4635/candidate/seed_2025/437aacff8c76/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_55ba4829b14d89bd/candidate/seed_2025/2a6cdac8b2a5/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_5657ffdc30f9cdbe/candidate/seed_2025/c55cfacb5911/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_6662d2a74b69d2e2/candidate/seed_2025/acbb1576a96a/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_71b00c2996c0929b/candidate/seed_2025/393850c618fb/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_7839cc5f655ccab1/candidate/seed_2025/d992a084e905/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_8922705ded22cd4a/candidate/seed_2025/801a2838572d/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_9d7d597ddc95f51d/candidate/seed_2025/9cbb2e9abf58/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_a1924c4cc2d86a81/candidate/seed_2025/21350b997835/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_d36089c083dafc1e/candidate/seed_2025/a636a63b7a49/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_d907358d81c11d3d/candidate/seed_2025/035f45a0189e/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_e6c2b7cf84e4e85c/candidate/seed_2025/df21f0c752da/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/cand_f74c0fb7d6f56389/candidate/seed_2025/036f1e8d3013/worker.log",
+    "logs/run_20261108_110259/trials/screen/f2022/control_ones/control/seed_2025/0f6d28ca507a/worker.log",
+    "results/_probe_batches/4b8a673e5adb0ec3c40d8fac/f2022.result.json",
+    "results/_probe_batches/4b8a673e5adb0ec3c40d8fac/job.json",
+    "results/llm_proposals/round_0_deepseek.json",
+    "results/run_20261108_110259/context.json",
+    "results/run_20261108_110259/evidence.jsonl",
+    "results/run_20261108_110259/report.json",
+    "results/run_20261108_110259/report.md",
+    "results/trials_summary.csv"
+  ],
+  "include": [
+    "results",
+    "logs",
+    "figures",
+    "code"
+  ],
+  "kinds": {
+    "code": {
+      "bytes": 0,
+      "files": 0
+    },
+    "data": {
+      "bytes": 45219257,
+      "files": 49
+    },
+    "figures": {
+      "bytes": 637638,
+      "files": 4
+    },
+    "logs": {
+      "bytes": 375117,
+      "files": 47
+    },
+    "models": {
+      "bytes": 0,
+      "files": 0
+    },
+    "results": {
+      "bytes": 2403169,
+      "files": 99
+    }
+  },
+  "published": {
+    "figures": 4,
+    "logs": 47,
+    "results": 8
+  },
+  "schema": "predicatelab.snapshot/1",
+  "source": "/home/zhengzengrong/PredicateLab/Predicate_Lab_v1.1/artifacts/tsil_tau_k020"
+}

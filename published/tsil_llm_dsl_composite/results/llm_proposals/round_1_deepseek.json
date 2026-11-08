@@ -1,0 +1,1416 @@
+{
+  "ok": true,
+  "model": "deepseek-flash",
+  "latency_s": 27.124,
+  "usage": {
+    "prompt_tokens": 3943,
+    "completion_tokens": 6838,
+    "total_tokens": 10781,
+    "prompt_tokens_details": {
+      "cached_tokens": 1152
+    },
+    "prompt_cache_hit_tokens": 1152,
+    "prompt_cache_miss_tokens": 2791
+  },
+  "error": "",
+  "analysis": "Previous round: 4 candidates promoted but all had negative full-validation effect despite positive screen_effect; 16 were screened out. Top screen effects came from (a) composite concat of dispersion[29,95] + drawdown[9,29] + path_efficiency[29,95] (screen 0.00484), (b) hurst_vr[29,95] + trend[0,9] + volatility[29,95] concat (0.00426), (c) symbolic with corr_half[95,158]x[29,95], slope[29,95], std[29,95] (0.00491), and (d) tail_asymmetry[29,95] + vol_price_corr[95,158] + volatility[29,95] (0.00430). The screen-to-validation inversion suggests overfitting to screen fold, likely from too-uniform weights and overlapping windows. Strategy for round 1: (1) emphasize concat composites (>=75%) mixing 2-4 complementary mechanisms across distinct Alpha158 slices and distinct windows (4-20); (2) prefer mechanisms whose screen effects were positive and whose windows were not all identical; (3) add cross-slice interactions (lead_lag_beta, vol_price_corr) to break uniformity; (4) use non-uniform weights favoring mechanisms with strongest screen evidence; (5) diversify by including a few symbolic-channels composites and a couple of mix composites for coverage; (6) keep window scales spread (short 4-6, mid 8-12, long 16-20) to reduce collinearity and preserve effective rank.",
+  "reasoning_content": "",
+  "n_proposals": 26,
+  "proposals": [
+    {
+      "kind": "composite",
+      "name": "Dispersion-Drawdown-PathEff refined",
+      "rationale": "Evolve the top screen candidate by reweighting toward dispersion and path_efficiency while keeping drawdown on KBar slice; distinct windows reduce collinearity and preserve effective rank.",
+      "parents": [
+        "cand_0560140eddf90458"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "dispersion",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 12
+            }
+          },
+          {
+            "family": "drawdown",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 6
+            }
+          },
+          {
+            "family": "path_efficiency",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 16
+            }
+          }
+        ],
+        "weights": [
+          1.4,
+          0.8,
+          1.1
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Hurst-Trend-Vol concat refined",
+      "rationale": "Evolve hurst_vr/trend/volatility composite with spread windows and non-uniform weights; trend on KBar [0,9] captures intraday morphology while hurst and vol capture regime persistence.",
+      "parents": [
+        "cand_d03ad8b18ab5617f"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "hurst_vr",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 18
+            }
+          },
+          {
+            "family": "trend",
+            "feature_slice": [
+              0,
+              9
+            ],
+            "params": {
+              "window": 4
+            }
+          },
+          {
+            "family": "volatility",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 8
+            }
+          }
+        ],
+        "weights": [
+          1.2,
+          1.0,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Tail-VolPrice-Vol concat refined",
+      "rationale": "Evolve tail_asymmetry/vol_price_corr/volatility with lead-lag emphasis on volume slice and shorter volatility window; asymmetric tails plus volume-price coupling should align residual heteroskedasticity.",
+      "parents": [
+        "cand_6185be06e8e2af0f"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "tail_asymmetry",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "vol_price_corr",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 6
+            }
+          },
+          {
+            "family": "volatility",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 4
+            }
+          }
+        ],
+        "weights": [
+          1.3,
+          1.1,
+          0.7
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Momentum-VolPrice-Vol concat",
+      "rationale": "Recombine momentum on momentum slice with vol_price_corr on volume slice and short-window volatility; distinct windows (12/10/5) and slices reduce collinearity while capturing trend, volume coupling, and risk.",
+      "parents": [
+        "cand_49ecfe0d040c68f0"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "momentum",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 12
+            }
+          },
+          {
+            "family": "vol_price_corr",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "volatility",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 5
+            }
+          }
+        ],
+        "weights": [
+          1.3,
+          0.9,
+          1.0
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Hurst-Momentum-Vol concat",
+      "rationale": "Replace volatility slice in screened hurst/mom/vol candidate with volume slice and spread windows; hurst on momentum slice, momentum on price slice, vol on volume slice gives orthogonal mechanisms.",
+      "parents": [
+        "cand_72009e9d39a127ba"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "hurst_vr",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 20
+            }
+          },
+          {
+            "family": "momentum",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 6
+            }
+          },
+          {
+            "family": "volatility",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 12
+            }
+          }
+        ],
+        "weights": [
+          1.4,
+          0.8,
+          1.0
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Drawdown-LeadLag-Vol mix refined",
+      "rationale": "Evolve screened mix candidate with spread windows; drawdown on momentum slice, lead_lag_beta on volume slice, volatility on price slice; mix kernel combines complementary local geometry.",
+      "parents": [
+        "cand_3b827a5942474630"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "drawdown",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "lead_lag_beta",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 8
+            }
+          },
+          {
+            "family": "volatility",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 5
+            }
+          }
+        ],
+        "weights": [
+          1.0,
+          1.3,
+          0.8
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Dispersion-PathEff-Semivar mix refined",
+      "rationale": "Evolve screened mix candidate by lengthening semivar window and shortening dispersion; semivar_ratio on momentum slice captures downside/upside asymmetry complementing path efficiency.",
+      "parents": [
+        "cand_066b9c7a4c9f42e5"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "dispersion",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 8
+            }
+          },
+          {
+            "family": "path_efficiency",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "semivar_ratio",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 16
+            }
+          }
+        ],
+        "weights": [
+          0.9,
+          1.2,
+          1.1
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "LeadLag-Semivar-Vol mix refined",
+      "rationale": "Evolve screened lead_lag/semivar/vol mix with spread windows across volume and momentum slices; lead_lag_beta on volume slice captures order-flow lead effects.",
+      "parents": [
+        "cand_41f050900dc64028"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "lead_lag_beta",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "semivar_ratio",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 8
+            }
+          },
+          {
+            "family": "volatility",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 6
+            }
+          }
+        ],
+        "weights": [
+          1.3,
+          1.0,
+          0.8
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Autocorr-Dispersion-Momentum mix",
+      "rationale": "Evolve screened autocorr/dispersion/momentum mix with spread windows; autocorr on price slice, dispersion on momentum slice, momentum on momentum slice with distinct windows.",
+      "parents": [
+        "cand_d914bc7ff21f2a17"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "autocorr",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 4
+            }
+          },
+          {
+            "family": "dispersion",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 12
+            }
+          },
+          {
+            "family": "momentum",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 8
+            }
+          }
+        ],
+        "weights": [
+          0.9,
+          1.2,
+          1.1
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "VolPrice-Tail-Momentum concat",
+      "rationale": "New concat combining volume-price coupling, tail asymmetry, and mid-horizon momentum across three distinct slices; non-uniform weights favor volume-price coupling which had strong screen evidence.",
+      "parents": [
+        "cand_6185be06e8e2af0f"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "vol_price_corr",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "tail_asymmetry",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 14
+            }
+          },
+          {
+            "family": "momentum",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 6
+            }
+          }
+        ],
+        "weights": [
+          1.4,
+          1.0,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Trend-Drawdown-Vol concat",
+      "rationale": "Concat trend on KBar slice, drawdown on price slice, volatility on momentum slice; captures intraday morphology, downside risk, and regime risk with distinct windows.",
+      "parents": [
+        "cand_d03ad8b18ab5617f"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "trend",
+            "feature_slice": [
+              0,
+              9
+            ],
+            "params": {
+              "window": 5
+            }
+          },
+          {
+            "family": "drawdown",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 8
+            }
+          },
+          {
+            "family": "volatility",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 12
+            }
+          }
+        ],
+        "weights": [
+          1.1,
+          1.0,
+          1.2
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Hurst-VolPrice-PathEff concat",
+      "rationale": "Combine persistence (hurst), volume-price coupling, and path efficiency across three slices; long persistence window vs short volume window creates scale diversity.",
+      "parents": [
+        "cand_d03ad8b18ab5617f"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "hurst_vr",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 20
+            }
+          },
+          {
+            "family": "vol_price_corr",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 6
+            }
+          },
+          {
+            "family": "path_efficiency",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 10
+            }
+          }
+        ],
+        "weights": [
+          1.3,
+          1.0,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Semivar-Tail-VolPrice mix",
+      "rationale": "Mix semivar_ratio (momentum slice), tail_asymmetry (momentum slice short window), and vol_price_corr (volume slice); asymmetric-risk mechanisms on different windows complement volume coupling.",
+      "parents": [
+        "cand_6185be06e8e2af0f"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "semivar_ratio",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 12
+            }
+          },
+          {
+            "family": "tail_asymmetry",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 6
+            }
+          },
+          {
+            "family": "vol_price_corr",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 10
+            }
+          }
+        ],
+        "weights": [
+          1.1,
+          0.9,
+          1.2
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Dispersion-Hurst-Momentum concat",
+      "rationale": "Combine cross-sectional dispersion (price slice), persistence (momentum slice), and momentum (price slice short window); distinct windows 8/16/5 reduce collinearity.",
+      "parents": [
+        "cand_72009e9d39a127ba"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "dispersion",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 8
+            }
+          },
+          {
+            "family": "hurst_vr",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 16
+            }
+          },
+          {
+            "family": "momentum",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 5
+            }
+          }
+        ],
+        "weights": [
+          1.0,
+          1.3,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "LeadLag-Drawdown-Trend mix",
+      "rationale": "Mix lead_lag_beta (volume slice), drawdown (price slice), trend (KBar slice); combines order-flow lead, downside risk, and intraday trend in a convex kernel.",
+      "parents": [
+        "cand_3b827a5942474630"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "lead_lag_beta",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 12
+            }
+          },
+          {
+            "family": "drawdown",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 6
+            }
+          },
+          {
+            "family": "trend",
+            "feature_slice": [
+              0,
+              9
+            ],
+            "params": {
+              "window": 4
+            }
+          }
+        ],
+        "weights": [
+          1.2,
+          1.0,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Autocorr-VolPrice-PathEff concat",
+      "rationale": "Concat autocorr (price slice), vol_price_corr (volume slice), path_efficiency (momentum slice); captures short-horizon mean reversion, volume coupling, and trend efficiency.",
+      "parents": [
+        "cand_d914bc7ff21f2a17"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "autocorr",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 5
+            }
+          },
+          {
+            "family": "vol_price_corr",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 8
+            }
+          },
+          {
+            "family": "path_efficiency",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 14
+            }
+          }
+        ],
+        "weights": [
+          0.9,
+          1.2,
+          1.1
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Volatility-Tail-Dispersion mix",
+      "rationale": "Mix volatility (volume slice), tail_asymmetry (momentum slice), dispersion (price slice); risk-focused trio with spread windows to preserve effective rank.",
+      "parents": [
+        "cand_6185be06e8e2af0f"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "volatility",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 8
+            }
+          },
+          {
+            "family": "tail_asymmetry",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 14
+            }
+          },
+          {
+            "family": "dispersion",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 6
+            }
+          }
+        ],
+        "weights": [
+          1.1,
+          1.0,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Momentum-Drawdown-VolPrice concat",
+      "rationale": "Concat momentum (price slice), drawdown (price slice short), vol_price_corr (volume slice); captures trend, reversal risk, and volume coupling with non-uniform weights.",
+      "parents": [
+        "cand_49ecfe0d040c68f0"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "momentum",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "drawdown",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 5
+            }
+          },
+          {
+            "family": "vol_price_corr",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 12
+            }
+          }
+        ],
+        "weights": [
+          1.2,
+          0.9,
+          1.1
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Hurst-Semivar-Trend mix",
+      "rationale": "Mix hurst_vr (momentum slice), semivar_ratio (momentum slice long), trend (KBar slice); persistence and asymmetric risk with intraday trend.",
+      "parents": [
+        "cand_d03ad8b18ab5617f"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "hurst_vr",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 18
+            }
+          },
+          {
+            "family": "semivar_ratio",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "trend",
+            "feature_slice": [
+              0,
+              9
+            ],
+            "params": {
+              "window": 6
+            }
+          }
+        ],
+        "weights": [
+          1.3,
+          1.0,
+          0.8
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "PathEff-LeadLag-Dispersion concat",
+      "rationale": "Concat path_efficiency (momentum slice), lead_lag_beta (volume slice), dispersion (price slice); trend quality, order-flow lead, and cross-sectional spread.",
+      "parents": [
+        "cand_0560140eddf90458"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "path_efficiency",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "lead_lag_beta",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 8
+            }
+          },
+          {
+            "family": "dispersion",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 12
+            }
+          }
+        ],
+        "weights": [
+          1.2,
+          1.0,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Symbolic vol-price slope + std + corr_half",
+      "rationale": "Evolve symbolic candidate with corr_half on volume-price slices, slope on momentum slice, and std on price slice; distinct windows and transforms preserve effective rank.",
+      "parents": [
+        "cand_b72b1a28f12bf7df"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "symbolic",
+            "params": {
+              "window": 12
+            },
+            "channels": [
+              {
+                "time_op": "mean",
+                "feature_op": "corr_half",
+                "window": 10,
+                "feature_slice": [
+                  95,
+                  158
+                ],
+                "interaction": "corr",
+                "rhs_slice": [
+                  29,
+                  95
+                ],
+                "rhs_time_op": "mean",
+                "rhs_window": 8,
+                "transform": "identity",
+                "weight": 1.0
+              },
+              {
+                "time_op": "slope",
+                "feature_op": "mean",
+                "window": 14,
+                "feature_slice": [
+                  29,
+                  95
+                ],
+                "interaction": "none",
+                "transform": "tanh",
+                "weight": 1.1
+              },
+              {
+                "time_op": "std",
+                "feature_op": "mean",
+                "window": 6,
+                "feature_slice": [
+                  9,
+                  29
+                ],
+                "interaction": "none",
+                "transform": "identity",
+                "weight": 0.9
+              }
+            ]
+          },
+          {
+            "family": "volatility",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 8
+            }
+          }
+        ],
+        "weights": [
+          1.4,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Symbolic skew-autocorr-std + momentum",
+      "rationale": "Evolve symbolic candidate with skew on momentum slice, autocorr on price slice, and std-diff interaction; add momentum part for trend alignment.",
+      "parents": [
+        "cand_3487e8fe8550d84d"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "symbolic",
+            "params": {
+              "window": 10
+            },
+            "channels": [
+              {
+                "time_op": "skew",
+                "feature_op": "mean",
+                "window": 10,
+                "feature_slice": [
+                  29,
+                  95
+                ],
+                "interaction": "none",
+                "transform": "identity",
+                "weight": 1.0
+              },
+              {
+                "time_op": "autocorr_1",
+                "feature_op": "mean",
+                "window": 6,
+                "feature_slice": [
+                  9,
+                  29
+                ],
+                "interaction": "none",
+                "transform": "tanh",
+                "weight": 1.1
+              },
+              {
+                "time_op": "std",
+                "feature_op": "std",
+                "window": 12,
+                "feature_slice": [
+                  29,
+                  95
+                ],
+                "interaction": "diff",
+                "rhs_slice": [
+                  9,
+                  29
+                ],
+                "rhs_time_op": "mean",
+                "rhs_window": 8,
+                "transform": "identity",
+                "weight": 0.9
+              }
+            ]
+          },
+          {
+            "family": "momentum",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 8
+            }
+          }
+        ],
+        "weights": [
+          1.3,
+          1.0
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Symbolic ema_diff-ratio + hurst",
+      "rationale": "Evolve screened symbolic candidate by adding hurst part; ema_diff on price slice, std ratio between momentum and volume slices, slope-diff interaction.",
+      "parents": [
+        "cand_bdeba363fbed2b5f"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "symbolic",
+            "params": {
+              "window": 12
+            },
+            "channels": [
+              {
+                "time_op": "ema_diff",
+                "feature_op": "mean",
+                "window": 8,
+                "feature_slice": [
+                  9,
+                  29
+                ],
+                "interaction": "none",
+                "transform": "identity",
+                "weight": 1.0
+              },
+              {
+                "time_op": "std",
+                "feature_op": "std",
+                "window": 6,
+                "feature_slice": [
+                  29,
+                  95
+                ],
+                "interaction": "ratio",
+                "rhs_slice": [
+                  95,
+                  158
+                ],
+                "rhs_time_op": "mean",
+                "rhs_window": 10,
+                "transform": "identity",
+                "weight": 1.1
+              },
+              {
+                "time_op": "slope",
+                "feature_op": "mean",
+                "window": 10,
+                "feature_slice": [
+                  9,
+                  29
+                ],
+                "interaction": "diff",
+                "rhs_slice": [
+                  29,
+                  95
+                ],
+                "rhs_time_op": "mean",
+                "rhs_window": 12,
+                "transform": "tanh",
+                "weight": 1.0
+              }
+            ]
+          },
+          {
+            "family": "hurst_vr",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 16
+            }
+          }
+        ],
+        "weights": [
+          1.4,
+          1.0
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Quad concat Hurst-VolPrice-Drawdown-Momentum",
+      "rationale": "Four-part concat across all four slices with spread windows 16/8/6/10; combines persistence, volume-price coupling, downside risk, and momentum for maximum mechanism diversity.",
+      "parents": [
+        "cand_d03ad8b18ab5617f",
+        "cand_6185be06e8e2af0f"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "hurst_vr",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 16
+            }
+          },
+          {
+            "family": "vol_price_corr",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 8
+            }
+          },
+          {
+            "family": "drawdown",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 6
+            }
+          },
+          {
+            "family": "momentum",
+            "feature_slice": [
+              0,
+              9
+            ],
+            "params": {
+              "window": 10
+            }
+          }
+        ],
+        "weights": [
+          1.2,
+          1.0,
+          0.8,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Quad mix Dispersion-Semivar-LeadLag-Vol",
+      "rationale": "Four-part mix combining dispersion, semivar_ratio, lead_lag_beta, and volatility across slices with spread windows; convex kernel adds local geometry diversity.",
+      "parents": [
+        "cand_066b9c7a4c9f42e5",
+        "cand_41f050900dc64028"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "dispersion",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 8
+            }
+          },
+          {
+            "family": "semivar_ratio",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 14
+            }
+          },
+          {
+            "family": "lead_lag_beta",
+            "feature_slice": [
+              95,
+              158
+            ],
+            "params": {
+              "window": 10
+            }
+          },
+          {
+            "family": "volatility",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 5
+            }
+          }
+        ],
+        "weights": [
+          0.9,
+          1.1,
+          1.2,
+          0.8
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Tail-PathEff-Autocorr concat",
+      "rationale": "Concat tail_asymmetry (momentum slice), path_efficiency (momentum slice long), autocorr (price slice short); asymmetric risk, trend efficiency, and mean reversion across scales.",
+      "parents": [
+        "cand_6185be06e8e2af0f",
+        "cand_0560140eddf90458"
+      ],
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "tail_asymmetry",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 12
+            }
+          },
+          {
+            "family": "path_efficiency",
+            "feature_slice": [
+              29,
+              95
+            ],
+            "params": {
+              "window": 18
+            }
+          },
+          {
+            "family": "autocorr",
+            "feature_slice": [
+              9,
+              29
+            ],
+            "params": {
+              "window": 4
+            }
+          }
+        ],
+        "weights": [
+          1.2,
+          1.1,
+          0.8
+        ]
+      }
+    }
+  ],
+  "raw_content": "{\n  \"round_analysis\": \"Previous round: 4 candidates promoted but all had negative full-validation effect despite positive screen_effect; 16 were screened out. Top screen effects came from (a) composite concat of dispersion[29,95] + drawdown[9,29] + path_efficiency[29,95] (screen 0.00484), (b) hurst_vr[29,95] + trend[0,9] + volatility[29,95] concat (0.00426), (c) symbolic with corr_half[95,158]x[29,95], slope[29,95], std[29,95] (0.00491), and (d) tail_asymmetry[29,95] + vol_price_corr[95,158] + volatility[29,95] (0.00430). The screen-to-validation inversion suggests overfitting to screen fold, likely from too-uniform weights and overlapping windows. Strategy for round 1: (1) emphasize concat composites (>=75%) mixing 2-4 complementary mechanisms across distinct Alpha158 slices and distinct windows (4-20); (2) prefer mechanisms whose screen effects were positive and whose windows were not all identical; (3) add cross-slice interactions (lead_lag_beta, vol_price_corr) to break uniformity; (4) use non-uniform weights favoring mechanisms with strongest screen evidence; (5) diversify by including a few symbolic-channels composites and a couple of mix composites for coverage; (6) keep window scales spread (short 4-6, mid 8-12, long 16-20) to reduce collinearity and preserve effective rank.\",\n  \"proposals\": [\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Dispersion-Drawdown-PathEff refined\",\n      \"rationale\": \"Evolve the top screen candidate by reweighting toward dispersion and path_efficiency while keeping drawdown on KBar slice; distinct windows reduce collinearity and preserve effective rank.\",\n      \"parents\": [\"cand_0560140eddf90458\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"dispersion\", \"feature_slice\": [29, 95], \"params\": {\"window\": 12}},\n          {\"family\": \"drawdown\", \"feature_slice\": [9, 29], \"params\": {\"window\": 6}},\n          {\"family\": \"path_efficiency\", \"feature_slice\": [29, 95], \"params\": {\"window\": 16}}\n        ],\n        \"weights\": [1.4, 0.8, 1.1]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Hurst-Trend-Vol concat refined\",\n      \"rationale\": \"Evolve hurst_vr/trend/volatility composite with spread windows and non-uniform weights; trend on KBar [0,9] captures intraday morphology while hurst and vol capture regime persistence.\",\n      \"parents\": [\"cand_d03ad8b18ab5617f\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"hurst_vr\", \"feature_slice\": [29, 95], \"params\": {\"window\": 18}},\n          {\"family\": \"trend\", \"feature_slice\": [0, 9], \"params\": {\"window\": 4}},\n          {\"family\": \"volatility\", \"feature_slice\": [29, 95], \"params\": {\"window\": 8}}\n        ],\n        \"weights\": [1.2, 1.0, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Tail-VolPrice-Vol concat refined\",\n      \"rationale\": \"Evolve tail_asymmetry/vol_price_corr/volatility with lead-lag emphasis on volume slice and shorter volatility window; asymmetric tails plus volume-price coupling should align residual heteroskedasticity.\",\n      \"parents\": [\"cand_6185be06e8e2af0f\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"tail_asymmetry\", \"feature_slice\": [29, 95], \"params\": {\"window\": 10}},\n          {\"family\": \"vol_price_corr\", \"feature_slice\": [95, 158], \"params\": {\"window\": 6}},\n          {\"family\": \"volatility\", \"feature_slice\": [29, 95], \"params\": {\"window\": 4}}\n        ],\n        \"weights\": [1.3, 1.1, 0.7]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Momentum-VolPrice-Vol concat\",\n      \"rationale\": \"Recombine momentum on momentum slice with vol_price_corr on volume slice and short-window volatility; distinct windows (12/10/5) and slices reduce collinearity while capturing trend, volume coupling, and risk.\",\n      \"parents\": [\"cand_49ecfe0d040c68f0\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"momentum\", \"feature_slice\": [29, 95], \"params\": {\"window\": 12}},\n          {\"family\": \"vol_price_corr\", \"feature_slice\": [95, 158], \"params\": {\"window\": 10}},\n          {\"family\": \"volatility\", \"feature_slice\": [29, 95], \"params\": {\"window\": 5}}\n        ],\n        \"weights\": [1.3, 0.9, 1.0]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Hurst-Momentum-Vol concat\",\n      \"rationale\": \"Replace volatility slice in screened hurst/mom/vol candidate with volume slice and spread windows; hurst on momentum slice, momentum on price slice, vol on volume slice gives orthogonal mechanisms.\",\n      \"parents\": [\"cand_72009e9d39a127ba\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"hurst_vr\", \"feature_slice\": [29, 95], \"params\": {\"window\": 20}},\n          {\"family\": \"momentum\", \"feature_slice\": [9, 29], \"params\": {\"window\": 6}},\n          {\"family\": \"volatility\", \"feature_slice\": [95, 158], \"params\": {\"window\": 12}}\n        ],\n        \"weights\": [1.4, 0.8, 1.0]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Drawdown-LeadLag-Vol mix refined\",\n      \"rationale\": \"Evolve screened mix candidate with spread windows; drawdown on momentum slice, lead_lag_beta on volume slice, volatility on price slice; mix kernel combines complementary local geometry.\",\n      \"parents\": [\"cand_3b827a5942474630\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"drawdown\", \"feature_slice\": [29, 95], \"params\": {\"window\": 10}},\n          {\"family\": \"lead_lag_beta\", \"feature_slice\": [95, 158], \"params\": {\"window\": 8}},\n          {\"family\": \"volatility\", \"feature_slice\": [9, 29], \"params\": {\"window\": 5}}\n        ],\n        \"weights\": [1.0, 1.3, 0.8]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Dispersion-PathEff-Semivar mix refined\",\n      \"rationale\": \"Evolve screened mix candidate by lengthening semivar window and shortening dispersion; semivar_ratio on momentum slice captures downside/upside asymmetry complementing path efficiency.\",\n      \"parents\": [\"cand_066b9c7a4c9f42e5\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"dispersion\", \"feature_slice\": [9, 29], \"params\": {\"window\": 8}},\n          {\"family\": \"path_efficiency\", \"feature_slice\": [29, 95], \"params\": {\"window\": 10}},\n          {\"family\": \"semivar_ratio\", \"feature_slice\": [29, 95], \"params\": {\"window\": 16}}\n        ],\n        \"weights\": [0.9, 1.2, 1.1]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"LeadLag-Semivar-Vol mix refined\",\n      \"rationale\": \"Evolve screened lead_lag/semivar/vol mix with spread windows across volume and momentum slices; lead_lag_beta on volume slice captures order-flow lead effects.\",\n      \"parents\": [\"cand_41f050900dc64028\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"lead_lag_beta\", \"feature_slice\": [95, 158], \"params\": {\"window\": 10}},\n          {\"family\": \"semivar_ratio\", \"feature_slice\": [29, 95], \"params\": {\"window\": 8}},\n          {\"family\": \"volatility\", \"feature_slice\": [95, 158], \"params\": {\"window\": 6}}\n        ],\n        \"weights\": [1.3, 1.0, 0.8]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Autocorr-Dispersion-Momentum mix\",\n      \"rationale\": \"Evolve screened autocorr/dispersion/momentum mix with spread windows; autocorr on price slice, dispersion on momentum slice, momentum on momentum slice with distinct windows.\",\n      \"parents\": [\"cand_d914bc7ff21f2a17\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"autocorr\", \"feature_slice\": [9, 29], \"params\": {\"window\": 4}},\n          {\"family\": \"dispersion\", \"feature_slice\": [29, 95], \"params\": {\"window\": 12}},\n          {\"family\": \"momentum\", \"feature_slice\": [29, 95], \"params\": {\"window\": 8}}\n        ],\n        \"weights\": [0.9, 1.2, 1.1]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"VolPrice-Tail-Momentum concat\",\n      \"rationale\": \"New concat combining volume-price coupling, tail asymmetry, and mid-horizon momentum across three distinct slices; non-uniform weights favor volume-price coupling which had strong screen evidence.\",\n      \"parents\": [\"cand_6185be06e8e2af0f\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"vol_price_corr\", \"feature_slice\": [95, 158], \"params\": {\"window\": 10}},\n          {\"family\": \"tail_asymmetry\", \"feature_slice\": [29, 95], \"params\": {\"window\": 14}},\n          {\"family\": \"momentum\", \"feature_slice\": [9, 29], \"params\": {\"window\": 6}}\n        ],\n        \"weights\": [1.4, 1.0, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Trend-Drawdown-Vol concat\",\n      \"rationale\": \"Concat trend on KBar slice, drawdown on price slice, volatility on momentum slice; captures intraday morphology, downside risk, and regime risk with distinct windows.\",\n      \"parents\": [\"cand_d03ad8b18ab5617f\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"trend\", \"feature_slice\": [0, 9], \"params\": {\"window\": 5}},\n          {\"family\": \"drawdown\", \"feature_slice\": [9, 29], \"params\": {\"window\": 8}},\n          {\"family\": \"volatility\", \"feature_slice\": [29, 95], \"params\": {\"window\": 12}}\n        ],\n        \"weights\": [1.1, 1.0, 1.2]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Hurst-VolPrice-PathEff concat\",\n      \"rationale\": \"Combine persistence (hurst), volume-price coupling, and path efficiency across three slices; long persistence window vs short volume window creates scale diversity.\",\n      \"parents\": [\"cand_d03ad8b18ab5617f\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"hurst_vr\", \"feature_slice\": [29, 95], \"params\": {\"window\": 20}},\n          {\"family\": \"vol_price_corr\", \"feature_slice\": [95, 158], \"params\": {\"window\": 6}},\n          {\"family\": \"path_efficiency\", \"feature_slice\": [29, 95], \"params\": {\"window\": 10}}\n        ],\n        \"weights\": [1.3, 1.0, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Semivar-Tail-VolPrice mix\",\n      \"rationale\": \"Mix semivar_ratio (momentum slice), tail_asymmetry (momentum slice short window), and vol_price_corr (volume slice); asymmetric-risk mechanisms on different windows complement volume coupling.\",\n      \"parents\": [\"cand_6185be06e8e2af0f\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"semivar_ratio\", \"feature_slice\": [29, 95], \"params\": {\"window\": 12}},\n          {\"family\": \"tail_asymmetry\", \"feature_slice\": [29, 95], \"params\": {\"window\": 6}},\n          {\"family\": \"vol_price_corr\", \"feature_slice\": [95, 158], \"params\": {\"window\": 10}}\n        ],\n        \"weights\": [1.1, 0.9, 1.2]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Dispersion-Hurst-Momentum concat\",\n      \"rationale\": \"Combine cross-sectional dispersion (price slice), persistence (momentum slice), and momentum (price slice short window); distinct windows 8/16/5 reduce collinearity.\",\n      \"parents\": [\"cand_72009e9d39a127ba\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"dispersion\", \"feature_slice\": [9, 29], \"params\": {\"window\": 8}},\n          {\"family\": \"hurst_vr\", \"feature_slice\": [29, 95], \"params\": {\"window\": 16}},\n          {\"family\": \"momentum\", \"feature_slice\": [9, 29], \"params\": {\"window\": 5}}\n        ],\n        \"weights\": [1.0, 1.3, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"LeadLag-Drawdown-Trend mix\",\n      \"rationale\": \"Mix lead_lag_beta (volume slice), drawdown (price slice), trend (KBar slice); combines order-flow lead, downside risk, and intraday trend in a convex kernel.\",\n      \"parents\": [\"cand_3b827a5942474630\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"lead_lag_beta\", \"feature_slice\": [95, 158], \"params\": {\"window\": 12}},\n          {\"family\": \"drawdown\", \"feature_slice\": [9, 29], \"params\": {\"window\": 6}},\n          {\"family\": \"trend\", \"feature_slice\": [0, 9], \"params\": {\"window\": 4}}\n        ],\n        \"weights\": [1.2, 1.0, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Autocorr-VolPrice-PathEff concat\",\n      \"rationale\": \"Concat autocorr (price slice), vol_price_corr (volume slice), path_efficiency (momentum slice); captures short-horizon mean reversion, volume coupling, and trend efficiency.\",\n      \"parents\": [\"cand_d914bc7ff21f2a17\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"autocorr\", \"feature_slice\": [9, 29], \"params\": {\"window\": 5}},\n          {\"family\": \"vol_price_corr\", \"feature_slice\": [95, 158], \"params\": {\"window\": 8}},\n          {\"family\": \"path_efficiency\", \"feature_slice\": [29, 95], \"params\": {\"window\": 14}}\n        ],\n        \"weights\": [0.9, 1.2, 1.1]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Volatility-Tail-Dispersion mix\",\n      \"rationale\": \"Mix volatility (volume slice), tail_asymmetry (momentum slice), dispersion (price slice); risk-focused trio with spread windows to preserve effective rank.\",\n      \"parents\": [\"cand_6185be06e8e2af0f\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"volatility\", \"feature_slice\": [95, 158], \"params\": {\"window\": 8}},\n          {\"family\": \"tail_asymmetry\", \"feature_slice\": [29, 95], \"params\": {\"window\": 14}},\n          {\"family\": \"dispersion\", \"feature_slice\": [9, 29], \"params\": {\"window\": 6}}\n        ],\n        \"weights\": [1.1, 1.0, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Momentum-Drawdown-VolPrice concat\",\n      \"rationale\": \"Concat momentum (price slice), drawdown (price slice short), vol_price_corr (volume slice); captures trend, reversal risk, and volume coupling with non-uniform weights.\",\n      \"parents\": [\"cand_49ecfe0d040c68f0\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"momentum\", \"feature_slice\": [9, 29], \"params\": {\"window\": 10}},\n          {\"family\": \"drawdown\", \"feature_slice\": [29, 95], \"params\": {\"window\": 5}},\n          {\"family\": \"vol_price_corr\", \"feature_slice\": [95, 158], \"params\": {\"window\": 12}}\n        ],\n        \"weights\": [1.2, 0.9, 1.1]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Hurst-Semivar-Trend mix\",\n      \"rationale\": \"Mix hurst_vr (momentum slice), semivar_ratio (momentum slice long), trend (KBar slice); persistence and asymmetric risk with intraday trend.\",\n      \"parents\": [\"cand_d03ad8b18ab5617f\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"hurst_vr\", \"feature_slice\": [29, 95], \"params\": {\"window\": 18}},\n          {\"family\": \"semivar_ratio\", \"feature_slice\": [29, 95], \"params\": {\"window\": 10}},\n          {\"family\": \"trend\", \"feature_slice\": [0, 9], \"params\": {\"window\": 6}}\n        ],\n        \"weights\": [1.3, 1.0, 0.8]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"PathEff-LeadLag-Dispersion concat\",\n      \"rationale\": \"Concat path_efficiency (momentum slice), lead_lag_beta (volume slice), dispersion (price slice); trend quality, order-flow lead, and cross-sectional spread.\",\n      \"parents\": [\"cand_0560140eddf90458\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"path_efficiency\", \"feature_slice\": [29, 95], \"params\": {\"window\": 10}},\n          {\"family\": \"lead_lag_beta\", \"feature_slice\": [95, 158], \"params\": {\"window\": 8}},\n          {\"family\": \"dispersion\", \"feature_slice\": [9, 29], \"params\": {\"window\": 12}}\n        ],\n        \"weights\": [1.2, 1.0, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Symbolic vol-price slope + std + corr_half\",\n      \"rationale\": \"Evolve symbolic candidate with corr_half on volume-price slices, slope on momentum slice, and std on price slice; distinct windows and transforms preserve effective rank.\",\n      \"parents\": [\"cand_b72b1a28f12bf7df\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\n            \"family\": \"symbolic\",\n            \"params\": {\"window\": 12},\n            \"channels\": [\n              {\"time_op\": \"mean\", \"feature_op\": \"corr_half\", \"window\": 10, \"feature_slice\": [95, 158], \"interaction\": \"corr\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"mean\", \"rhs_window\": 8, \"transform\": \"identity\", \"weight\": 1.0},\n              {\"time_op\": \"slope\", \"feature_op\": \"mean\", \"window\": 14, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"tanh\", \"weight\": 1.1},\n              {\"time_op\": \"std\", \"feature_op\": \"mean\", \"window\": 6, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 0.9}\n            ]\n          },\n          {\"family\": \"volatility\", \"feature_slice\": [95, 158], \"params\": {\"window\": 8}}\n        ],\n        \"weights\": [1.4, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Symbolic skew-autocorr-std + momentum\",\n      \"rationale\": \"Evolve symbolic candidate with skew on momentum slice, autocorr on price slice, and std-diff interaction; add momentum part for trend alignment.\",\n      \"parents\": [\"cand_3487e8fe8550d84d\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\n            \"family\": \"symbolic\",\n            \"params\": {\"window\": 10},\n            \"channels\": [\n              {\"time_op\": \"skew\", \"feature_op\": \"mean\", \"window\": 10, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0},\n              {\"time_op\": \"autocorr_1\", \"feature_op\": \"mean\", \"window\": 6, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"tanh\", \"weight\": 1.1},\n              {\"time_op\": \"std\", \"feature_op\": \"std\", \"window\": 12, \"feature_slice\": [29, 95], \"interaction\": \"diff\", \"rhs_slice\": [9, 29], \"rhs_time_op\": \"mean\", \"rhs_window\": 8, \"transform\": \"identity\", \"weight\": 0.9}\n            ]\n          },\n          {\"family\": \"momentum\", \"feature_slice\": [29, 95], \"params\": {\"window\": 8}}\n        ],\n        \"weights\": [1.3, 1.0]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Symbolic ema_diff-ratio + hurst\",\n      \"rationale\": \"Evolve screened symbolic candidate by adding hurst part; ema_diff on price slice, std ratio between momentum and volume slices, slope-diff interaction.\",\n      \"parents\": [\"cand_bdeba363fbed2b5f\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\n            \"family\": \"symbolic\",\n            \"params\": {\"window\": 12},\n            \"channels\": [\n              {\"time_op\": \"ema_diff\", \"feature_op\": \"mean\", \"window\": 8, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0},\n              {\"time_op\": \"std\", \"feature_op\": \"std\", \"window\": 6, \"feature_slice\": [29, 95], \"interaction\": \"ratio\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"mean\", \"rhs_window\": 10, \"transform\": \"identity\", \"weight\": 1.1},\n              {\"time_op\": \"slope\", \"feature_op\": \"mean\", \"window\": 10, \"feature_slice\": [9, 29], \"interaction\": \"diff\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"mean\", \"rhs_window\": 12, \"transform\": \"tanh\", \"weight\": 1.0}\n            ]\n          },\n          {\"family\": \"hurst_vr\", \"feature_slice\": [29, 95], \"params\": {\"window\": 16}}\n        ],\n        \"weights\": [1.4, 1.0]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Quad concat Hurst-VolPrice-Drawdown-Momentum\",\n      \"rationale\": \"Four-part concat across all four slices with spread windows 16/8/6/10; combines persistence, volume-price coupling, downside risk, and momentum for maximum mechanism diversity.\",\n      \"parents\": [\"cand_d03ad8b18ab5617f\", \"cand_6185be06e8e2af0f\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"hurst_vr\", \"feature_slice\": [29, 95], \"params\": {\"window\": 16}},\n          {\"family\": \"vol_price_corr\", \"feature_slice\": [95, 158], \"params\": {\"window\": 8}},\n          {\"family\": \"drawdown\", \"feature_slice\": [9, 29], \"params\": {\"window\": 6}},\n          {\"family\": \"momentum\", \"feature_slice\": [0, 9], \"params\": {\"window\": 10}}\n        ],\n        \"weights\": [1.2, 1.0, 0.8, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Quad mix Dispersion-Semivar-LeadLag-Vol\",\n      \"rationale\": \"Four-part mix combining dispersion, semivar_ratio, lead_lag_beta, and volatility across slices with spread windows; convex kernel adds local geometry diversity.\",\n      \"parents\": [\"cand_066b9c7a4c9f42e5\", \"cand_41f050900dc64028\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"dispersion\", \"feature_slice\": [9, 29], \"params\": {\"window\": 8}},\n          {\"family\": \"semivar_ratio\", \"feature_slice\": [29, 95], \"params\": {\"window\": 14}},\n          {\"family\": \"lead_lag_beta\", \"feature_slice\": [95, 158], \"params\": {\"window\": 10}},\n          {\"family\": \"volatility\", \"feature_slice\": [29, 95], \"params\": {\"window\": 5}}\n        ],\n        \"weights\": [0.9, 1.1, 1.2, 0.8]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Tail-PathEff-Autocorr concat\",\n      \"rationale\": \"Concat tail_asymmetry (momentum slice), path_efficiency (momentum slice long), autocorr (price slice short); asymmetric risk, trend efficiency, and mean reversion across scales.\",\n      \"parents\": [\"cand_6185be06e8e2af0f\", \"cand_0560140eddf90458\"],\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"tail_asymmetry\", \"feature_slice\": [29, 95], \"params\": {\"window\": 12}},\n          {\"family\": \"path_efficiency\", \"feature_slice\": [29, 95], \"params\": {\"window\": 18}},\n          {\"family\": \"autocorr\", \"feature_slice\": [9, 29], \"params\": {\"window\": 4}}\n        ],\n        \"weights\": [1.2, 1.1, 0.8]\n      }\n    }\n  ]\n}",
+  "system_prompt": "You are an autonomous Quantitative Financial AI Scientist in PredicateLab (TSIL domain).\nYour objective is to construct mathematically rigorous relational predicates P(X) for the LUSI (Learning Using Statistical Invariants) loss on the CSI300 daily Alpha158 stock panel:\n    L(y, y_hat) = tau_hat * ||y - y_hat||_I^2 + tau * (y - y_hat)^T P(X) (y - y_hat)\nwhere batch_x has shape [B, T=20, F=158], phi(X) in R^(B x d) is standardized per column and normalized to unit Frobenius norm, and P(X) = phi_hat(X) @ phi_hat(X)^T.\n\nCRITICAL SCIENTIFIC & MATHEMATICAL CONSTRAINTS:\n1. Non-Collapse / High Effective Rank Gate:\n   Every candidate is tested on a real CSI300 batch before training. If participation-ratio effective rank r_eff(P) = (tr(P))^2 / ||P||_F^2 < 1.25 or off-diagonal cosine alignment with 11^T/B > 0.98, the kernel collapses to the trivial global shrinkage control (`control:ones`) and is REJECTED.\n   Therefore, design descriptors with d >= 3 diverse, weakly correlated dimensions!\n2. Beat Both MSE Baseline and `control:ones`:\n   A candidate is only validated if paired Delta_IC > min_effect, its 95% block-bootstrap CI lower bound > 0, AND it outperforms `control:ones`.\n3. Alpha158 Feature Subspace Map (feature_dim=158, valid slice [start, end] with 0 <= start < end <= 158 and end - start >= 2):\n   - [0, 9]: KBar intraday candlestick morphology (body, upper/lower shadow, shift)\n   - [9, 29]: Raw price/VWAP channels across short lags\n   - [29, 95]: Rolling return, momentum, trend R^2, volatility, skewness, rank, support/resistance\n   - [95, 158]: Volume, order-flow imbalance, volume-weighted volatility, price-volume correlation\n\nALLOWED DESCRIPTOR SCHEMAS (Pure JSON data, no Python code):\n\nSchema A — Novel LLM-Constructed Symbolic Tensor Predicate (`family: \"symbolic\"`, `kind: \"statistical\" | \"relational\" | \"soft\"`):\n{\n  \"kind\": \"statistical\",\n  \"name\": \"concise descriptive name\",\n  \"rationale\": \"financial & statistical hypothesis explaining why this kernel aligns residuals\",\n  \"parents\": [\"optional_parent_candidate_id\"],\n  \"descriptor\": {\n    \"family\": \"symbolic\",\n    \"params\": {\"window\": 12},\n    \"channels\": [\n      {\n        \"time_op\": \"one of: mean|std|slope|accel|ema_diff|max_drawdown|semivar_asymmetry|skew|kurt|q_spread|autocorr_1|hurst_proxy|path_efficiency\",\n        \"feature_op\": \"one of: mean|std|max|min|iqr|l2_norm|top_bottom_spread|corr_half\",\n        \"window\": 10,\n        \"feature_slice\": [29, 95],\n        \"interaction\": \"one of: none|diff|ratio|product|corr|beta|lead_lag_corr\",\n        \"rhs_slice\": [95, 158],\n        \"rhs_time_op\": \"optional time_op when interaction in diff|ratio|product\",\n        \"rhs_window\": 15,\n        \"transform\": \"one of: identity|abs|tanh|sign_sqrt\",\n        \"weight\": 1.0\n      }\n      // MUST include between 3 and 6 distinct channel objects in `channels`\n    ]\n  }\n}\n\nSchema B — Atomic Mathematical Operator Predicate (`kind: \"statistical\" | \"soft\" | \"relational\"`):\n- Allowed `family`: \"semivar_ratio\" | \"vol_price_corr\" | \"path_efficiency\" | \"hurst_vr\" | \"lead_lag_beta\" | \"regime_transition\" | \"tail_asymmetry\" | \"momentum\" | \"volatility\" | \"dispersion\" | \"autocorr\" | \"drawdown\" | \"tail\" | \"trend\"\n- `params`: {\"window\": integer in [3, 20]}\n- Optional `feature_slice`: [start, end]\n\nSchema C — DSL-Composed Multi-Mechanism Predicate (`family: \"composite\"`, `kind: \"composite\"`):\n{\n  \"kind\": \"composite\",\n  \"name\": \"concise composite name\",\n  \"rationale\": \"why combining these mechanisms improves cross-sectional IC ranking\",\n  \"parents\": [\"optional_parent_candidate_id\"],\n  \"descriptor\": {\n    \"family\": \"composite\",\n    \"combine\": \"concat\",  // \"concat\" (for DSL/symbolic parts) or \"mix\" (kernel convex combination, required if any part is family=\"native\")\n    \"parts\": [ /* 2 to 4 valid Schema A or Schema B (or native) descriptor dicts */ ],\n    \"weights\": [1.2, 1.0, 0.8]  // positive floats in (0, 10], same length as parts\n  }\n}\n\nMODE DIRECTIVE FOR THIS RUN:\nFocus primarily (>= 75% of proposals) on DSL-COMPOSED PREDICATES (`family: \"composite\"` with `combine: \"concat\"` or `\"mix\"`, combining 2..4 complementary sub-descriptors across distinct windows and Alpha158 feature slices `[start, end]`).\n\nReturn strictly a JSON object with keys:\n{\n  \"round_analysis\": \"concise synthesis of empirical evidence and hypothesis strategy for this round\",\n  \"proposals\": [ /* list of 26 candidate objects */ ]\n}",
+  "user_prompt": "Round Index: 1\nTarget Valid Proposals Needed: 20 (please output 26 diverse proposals so we have buffer after deduplication).\nTask Question: Under an identical LSTM, identical folds and an identical training budget, do LLM-constructed predicates (novel symbolic tensor formulas and DSL compositions) improve daily cross-sectional IC relative to plain MSE, the Phi_ones control, and a deterministic rule-based DSL search?\nAlready Evaluated Template Count: 20\n\n=== EMPIRICAL FEEDBACK FROM PREVIOUS DISCOVERY ROUND (Discovery Folds Only) ===\n\n[INSUFFICIENT EVIDENCE (Promoted to Full Validation, Partial/Sub-threshold)] (count=4):\n  - id=cand_0560140eddf90458 | effect=-0.0010812281063312629 | screen_effect=0.004837818727865942 | stability=None | reason=\n    descriptor={\"combine\": \"concat\", \"family\": \"composite\", \"parts\": [{\"family\": \"dispersion\", \"feature_slice\": [29, 95], \"params\": {\"window\": 10}}, {\"family\": \"drawdown\", \"feature_slice\": [9, 29], \"params\": {\"window\": 8}}, {\"family\": \"path_efficiency\", \"feature_slice\": [29, 95], \"params\": {\"window\": 12}}], \"weights\": [0.3, 0.33333333, 0.36666667]}\n  - id=cand_d03ad8b18ab5617f | effect=-0.0014990094332983164 | screen_effect=0.0042604015385026 | stability=None | reason=\n    descriptor={\"combine\": \"concat\", \"family\": \"composite\", \"parts\": [{\"family\": \"hurst_vr\", \"feature_slice\": [29, 95], \"params\": {\"window\": 20}}, {\"family\": \"trend\", \"feature_slice\": [0, 9], \"params\": {\"window\": 5}}, {\"family\": \"volatility\", \"feature_slice\": [29, 95], \"params\": {\"window\": 10}}], \"weights\": [0.38709677, 0.29032258, 0.32258065]}\n  - id=cand_b72b1a28f12bf7df | effect=-0.001657539924504547 | screen_effect=0.004912502645953869 | stability=None | reason=\n    descriptor={\"channels\": [{\"feature_op\": \"corr_half\", \"feature_slice\": [95, 158], \"interaction\": \"corr\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"mean\", \"rhs_window\": 10, \"time_op\": \"mean\", \"transform\": \"identity\", \"weight\": 0.9, \"window\": 10}, {\"feature_op\": \"mean\", \"feature_slice\": [29, 95], \"interaction\": \"none\", \"time_op\": \"slope\", \"transform\": \"tanh\", \"weight\": 1.2, \"window\": 12}, {\"feature_op\": \"mean\", \"feature_slice\": [29, 95], \"interaction\": \"none\", \"time_op\": \"std\", \"transform\": \"identity\", \"weight\": 1.0, \"window\": 5}], \"family\": \"symbolic\", \"params\": {\"window\": 12}}\n  - id=cand_6185be06e8e2af0f | effect=-0.002564389484261124 | screen_effect=0.004300567738136672 | stability=None | reason=\n    descriptor={\"combine\": \"concat\", \"family\": \"composite\", \"parts\": [{\"family\": \"tail_asymmetry\", \"feature_slice\": [29, 95], \"params\": {\"window\": 12}}, {\"family\": \"vol_price_corr\", \"feature_slice\": [95, 158], \"params\": {\"window\": 8}}, {\"family\": \"volatility\", \"feature_slice\": [29, 95], \"params\": {\"window\": 5}}], \"weights\": [0.36666667, 0.3, 0.33333333]}\n\n[SCREENED OUT (Evaluated on Screen Fold)] (count=16):\n  - id=cand_3b827a5942474630 | effect=None | screen_effect=0.0035156067079109414 | stability=None | reason=\n    descriptor={\"combine\": \"mix\", \"family\": \"composite\", \"parts\": [{\"family\": \"drawdown\", \"feature_slice\": [29, 95], \"params\": {\"window\": 12}}, {\"family\": \"lead_lag_beta\", \"feature_slice\": [95, 158], \"params\": {\"window\": 10}}, {\"family\": \"volatility\", \"feature_slice\": [9, 29], \"params\": {\"window\": 5}}], \"weights\": [0.3, 0.36666667, 0.33333333]}\n  - id=cand_066b9c7a4c9f42e5 | effect=None | screen_effect=0.003194040287145578 | stability=None | reason=\n    descriptor={\"combine\": \"mix\", \"family\": \"composite\", \"parts\": [{\"family\": \"dispersion\", \"feature_slice\": [9, 29], \"params\": {\"window\": 10}}, {\"family\": \"path_efficiency\", \"feature_slice\": [29, 95], \"params\": {\"window\": 8}}, {\"family\": \"semivar_ratio\", \"feature_slice\": [29, 95], \"params\": {\"window\": 12}}], \"weights\": [0.31034483, 0.34482759, 0.34482759]}\n  - id=cand_72009e9d39a127ba | effect=None | screen_effect=0.003154071319034534 | stability=None | reason=\n    descriptor={\"combine\": \"concat\", \"family\": \"composite\", \"parts\": [{\"family\": \"hurst_vr\", \"feature_slice\": [29, 95], \"params\": {\"window\": 20}}, {\"family\": \"momentum\", \"feature_slice\": [9, 29], \"params\": {\"window\": 5}}, {\"family\": \"volatility\", \"feature_slice\": [95, 158], \"params\": {\"window\": 12}}], \"weights\": [0.4, 0.33333333, 0.26666667]}\n  - id=cand_41f050900dc64028 | effect=None | screen_effect=0.0031343234778830097 | stability=None | reason=\n    descriptor={\"combine\": \"mix\", \"family\": \"composite\", \"parts\": [{\"family\": \"lead_lag_beta\", \"feature_slice\": [95, 158], \"params\": {\"window\": 12}}, {\"family\": \"semivar_ratio\", \"feature_slice\": [29, 95], \"params\": {\"window\": 10}}, {\"family\": \"volatility\", \"feature_slice\": [95, 158], \"params\": {\"window\": 5}}], \"weights\": [0.37931034, 0.34482759, 0.27586207]}\n  - id=cand_49ecfe0d040c68f0 | effect=None | screen_effect=0.00304236791966201 | stability=None | reason=\n    descriptor={\"combine\": \"concat\", \"family\": \"composite\", \"parts\": [{\"family\": \"momentum\", \"feature_slice\": [29, 95], \"params\": {\"window\": 12}}, {\"family\": \"vol_price_corr\", \"feature_slice\": [95, 158], \"params\": {\"window\": 10}}, {\"family\": \"volatility\", \"feature_slice\": [29, 95], \"params\": {\"window\": 5}}], \"weights\": [0.4, 0.26666667, 0.33333333]}\n  - id=cand_d914bc7ff21f2a17 | effect=None | screen_effect=0.002701644603298084 | stability=None | reason=\n    descriptor={\"combine\": \"mix\", \"family\": \"composite\", \"parts\": [{\"family\": \"autocorr\", \"feature_slice\": [9, 29], \"params\": {\"window\": 5}}, {\"family\": \"dispersion\", \"feature_slice\": [29, 95], \"params\": {\"window\": 10}}, {\"family\": \"momentum\", \"feature_slice\": [29, 95], \"params\": {\"window\": 12}}], \"weights\": [0.33333333, 0.26666667, 0.4]}\n  - id=cand_bdeba363fbed2b5f | effect=None | screen_effect=0.0026798838081227194 | stability=None | reason=\n    descriptor={\"channels\": [{\"feature_op\": \"mean\", \"feature_slice\": [9, 29], \"interaction\": \"diff\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"mean\", \"rhs_window\": 10, \"time_op\": \"slope\", \"transform\": \"tanh\", \"weight\": 1.0, \"window\": 10}, {\"feature_op\": \"mean\", \"feature_slice\": [9, 29], \"interaction\": \"none\", \"time_op\": \"ema_diff\", \"transform\": \"identity\", \"weight\": 0.9, \"window\": 8}, {\"feature_op\": \"std\", \"feature_slice\": [29, 95], \"interaction\": \"ratio\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"mean\", \"rhs_window\": 5, \"time_op\": \"std\", \"transform\": \"identity\", \"weight\": 1.1, \"window\": 5}], \"family\": \"symbolic\", \"params\": {\"window\": 12}}\n  - id=cand_3487e8fe8550d84d | effect=None | screen_effect=0.0024204840867088242 | stability=None | reason=\n    descriptor={\"channels\": [{\"feature_op\": \"mean\", \"feature_slice\": [29, 95], \"interaction\": \"none\", \"time_op\": \"skew\", \"transform\": \"identity\", \"weight\": 0.9, \"window\": 8}, {\"feature_op\": \"mean\", \"feature_slice\": [9, 29], \"interaction\": \"none\", \"time_op\": \"autocorr_1\", \"transform\": \"tanh\", \"weight\": 1.0, \"window\": 5}, {\"feature_op\": \"std\", \"feature_slice\": [29, 95], \"interaction\": \"diff\", \"rhs_slice\": [9, 29], \"rhs_time_op\": \"mean\", \"rhs_window\": 10, \"time_op\": \"std\", \"transform\": \"identity\", \"weight\": 1.1, \"window\": 10}], \"family\": \"symbolic\", \"params\": {\"window\": 12}}\n\nINSTRUCTIONS FOR EVOLUTIONARY ROUND 1:\n1. Analyze which operator families, symbolic channels, lookback windows, and feature slices achieved the highest positive `screen_effect` and full-validation `effect`.\n2. Evolve the top-performing candidates by refining their window scales, isolating informative Alpha158 subspaces ([0,9], [9,29], [29,95], [95,158]), adding cross-channel interactions (`lead_lag_corr`, `beta`, `corr`, `ratio`), or combining complementary winners via `composite` (`concat` or `mix`).\n3. Set `parents` to the `candidate_id`s of the previous-round candidates you are evolving.\n4. Do NOT repeat any descriptor already listed above."
+}

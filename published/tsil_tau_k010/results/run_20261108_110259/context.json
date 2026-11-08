@@ -1,0 +1,545 @@
+{
+  "code": {
+    "commit": "f3e2ed7f389f922fc94a6a291efad648aeeabab1",
+    "dirty": true,
+    "dirty_fingerprint": "0ad2f23e528ed57b66de4bb487359009cb7a94c98f1021a2c0311f86b9577983",
+    "external_trees": {
+      "root_0:TSIL-main": "ad23c0ffff105f69b15aea6d3d92cd379105a9bf29732446bbcd46e0aa5a46cf"
+    },
+    "n_source_files": 69,
+    "source_tree_hash": "b7527257ae624b17c27772771e97bab0878e445d539bb5295cba0d4554f51ebf",
+    "status_lines": 30
+  },
+  "data_contract": {
+    "caveats": [
+      "Survivorship/instrument membership is whatever the supplied qlib store contains.",
+      "RobustZScoreNorm is fitted per fold on that fold's training period only.",
+      "Adjusted prices are taken as-is from the provided qlib data."
+    ],
+    "dataset_id": "qlib-cn-csi300",
+    "description": "China A-share daily Alpha158 panel from the shared qlib store.",
+    "domain": "tsil",
+    "entity_key": "instrument",
+    "feature_semantics": {
+      "alpha158": "158 qlib Alpha158 price-volume features"
+    },
+    "frequency": "daily",
+    "label_definition": "Ref($close, -2) / Ref($close, -1) - 1",
+    "label_dependency": {
+      "calendar": "qlib calendars/day.txt",
+      "expression": "Ref($close, -2) / Ref($close, -1) - 1",
+      "future_offset_trading_days": 2,
+      "preprocessing": "CSRankNorm label, DropnaLabel, RobustZScoreNorm features per fold"
+    },
+    "label_window": {
+      "horizon": 1,
+      "note": "Ref($close,-2)/Ref($close,-1)-1 needs t+1 and t+2 prices",
+      "unit": "trading_day",
+      "uses_future_days": 2
+    },
+    "preprocessing_version": "tsil-alpha158-csrank-v1",
+    "time_key": "datetime",
+    "time_range": [
+      "2000-01-04",
+      "2026-06-03"
+    ],
+    "universe": "csi300"
+  },
+  "data_manifest_hash": "8c64b2561732ec4ba5e6817380b3ce1193f979b3109997839d7ac62b8008b248",
+  "domain": "tsil",
+  "effective_protocol": {
+    "confirmation_folds": [
+      {
+        "embargo_days": 3,
+        "fold_id": "f2024",
+        "kind": "time",
+        "metadata": {},
+        "notes": "effective train_end=2023-12-27, valid_start=2024-01-05; label isolation trimmed train_end 2023-12-27->2023-12-25 (tail labels need prices at/after valid_start); label isolation trimmed valid_end 2024-12-31->2024-12-27 (2 dates need later prices)",
+        "purge_days": 2,
+        "role": "confirmation",
+        "test_end": null,
+        "test_start": null,
+        "train_end": "2023-12-25",
+        "train_start": "2018-01-01",
+        "valid_end": "2024-12-27",
+        "valid_start": "2024-01-05"
+      }
+    ],
+    "folds": [
+      {
+        "embargo_days": 3,
+        "fold_id": "f2020",
+        "kind": "time",
+        "metadata": {},
+        "notes": "effective train_end=2019-12-27, valid_start=2020-01-07; label isolation trimmed train_end 2019-12-27->2019-12-25 (tail labels need prices at/after valid_start); label isolation trimmed valid_end 2020-12-31->2020-12-29 (2 dates need later prices)",
+        "purge_days": 2,
+        "role": "search",
+        "test_end": null,
+        "test_start": null,
+        "train_end": "2019-12-25",
+        "train_start": "2018-01-01",
+        "valid_end": "2020-12-29",
+        "valid_start": "2020-01-07"
+      },
+      {
+        "embargo_days": 3,
+        "fold_id": "f2021",
+        "kind": "time",
+        "metadata": {},
+        "notes": "effective train_end=2020-12-29, valid_start=2021-01-07; label isolation trimmed train_end 2020-12-29->2020-12-25 (tail labels need prices at/after valid_start); label isolation trimmed valid_end 2021-12-31->2021-12-29 (2 dates need later prices)",
+        "purge_days": 2,
+        "role": "search",
+        "test_end": null,
+        "test_start": null,
+        "train_end": "2020-12-25",
+        "train_start": "2018-01-01",
+        "valid_end": "2021-12-29",
+        "valid_start": "2021-01-07"
+      },
+      {
+        "embargo_days": 3,
+        "fold_id": "f2022",
+        "kind": "time",
+        "metadata": {},
+        "notes": "effective train_end=2021-12-29, valid_start=2022-01-07; label isolation trimmed train_end 2021-12-29->2021-12-27 (tail labels need prices at/after valid_start); label isolation trimmed valid_end 2022-12-31->2022-12-28 (2 dates need later prices)",
+        "purge_days": 2,
+        "role": "search",
+        "test_end": null,
+        "test_start": null,
+        "train_end": "2021-12-27",
+        "train_start": "2018-01-01",
+        "valid_end": "2022-12-28",
+        "valid_start": "2022-01-07"
+      }
+    ],
+    "holdout": {
+      "embargo_days": 3,
+      "fold_id": "holdout_2025_2026",
+      "kind": "time",
+      "metadata": {
+        "label_future_offset_trading_days": 2,
+        "nominal_test_end": "2026-03-31",
+        "nominal_test_start": "2025-09-01"
+      },
+      "notes": "effective train_end=2023-12-27, valid_start=2024-01-05; label isolation trimmed train_end 2023-12-27->2023-12-25 (tail labels need prices at/after valid_start); label isolation trimmed valid_end 2024-12-31->2024-12-27 (2 dates need later prices); label isolation trimmed test_end 2026-03-31->2026-03-27 (2 dates need later prices, 0 unavailable at calendar end)",
+      "purge_days": 2,
+      "role": "holdout",
+      "test_end": "2026-03-27",
+      "test_start": "2025-09-01",
+      "train_end": "2023-12-25",
+      "train_start": "2018-01-01",
+      "valid_end": "2024-12-27",
+      "valid_start": "2024-01-05"
+    }
+  },
+  "environment": {
+    "numpy": "1.26.4",
+    "pandas": "2.2.3",
+    "platform": "Linux-3.10.0-1160.el7.x86_64-x86_64-with-glibc2.17",
+    "pydantic": "2.14.3",
+    "python": "3.11.9",
+    "qlib": "0.9.6",
+    "scipy": "1.14.1",
+    "sklearn": "1.5.2",
+    "torch": "2.3.1+cu121"
+  },
+  "evaluation": {
+    "direction": "higher",
+    "multiple_testing": "benjamini-hochberg",
+    "name": "tsil_rolling_ic",
+    "notes": "daily cross-sectional IC on each validation fold; paired against the MSE baseline trained with identical seeds, data and budget; every candidate must also beat control:ones.",
+    "paired": true,
+    "primary_metric": "ic",
+    "secondary_metrics": [
+      "rank_ic",
+      "icir",
+      "mse"
+    ]
+  },
+  "identity_hash": "de242309dcaab2385dcd87f43eb83393cba43e749d4a8eb8109e4650392867ee",
+  "label_expression": "Ref($close, -2) / Ref($close, -1) - 1",
+  "label_isolation": {
+    "calendar_end": "2026-06-03",
+    "calendar_start": "2000-01-04",
+    "folds": {
+      "f2020": {
+        "fold_id": "f2020",
+        "future_offset_trading_days": 2,
+        "label_expression": "Ref($close, -2) / Ref($close, -1) - 1",
+        "nominal": {
+          "test_end": null,
+          "test_start": null,
+          "train_end": "2019-12-27",
+          "train_start": "2018-01-01",
+          "valid_end": "2020-12-31",
+          "valid_start": "2020-01-07"
+        },
+        "ok": true,
+        "partition": "discovery",
+        "train": {
+          "effective_train_end": "2019-12-25",
+          "last_label_available": "2019-12-27",
+          "trimmed": true
+        },
+        "valid": {
+          "effective_valid_end": "2020-12-29",
+          "label_unavailable_dates": [],
+          "last_label_available": "2020-12-31",
+          "n_trimmed_dates": 2,
+          "nominal_valid_end": "2020-12-31",
+          "trimmed_dates": [
+            "2020-12-30",
+            "2020-12-31"
+          ]
+        }
+      },
+      "f2021": {
+        "fold_id": "f2021",
+        "future_offset_trading_days": 2,
+        "label_expression": "Ref($close, -2) / Ref($close, -1) - 1",
+        "nominal": {
+          "test_end": null,
+          "test_start": null,
+          "train_end": "2020-12-29",
+          "train_start": "2018-01-01",
+          "valid_end": "2021-12-31",
+          "valid_start": "2021-01-07"
+        },
+        "ok": true,
+        "partition": "discovery",
+        "train": {
+          "effective_train_end": "2020-12-25",
+          "last_label_available": "2020-12-29",
+          "trimmed": true
+        },
+        "valid": {
+          "effective_valid_end": "2021-12-29",
+          "label_unavailable_dates": [],
+          "last_label_available": "2021-12-31",
+          "n_trimmed_dates": 2,
+          "nominal_valid_end": "2021-12-31",
+          "trimmed_dates": [
+            "2021-12-30",
+            "2021-12-31"
+          ]
+        }
+      },
+      "f2022": {
+        "fold_id": "f2022",
+        "future_offset_trading_days": 2,
+        "label_expression": "Ref($close, -2) / Ref($close, -1) - 1",
+        "nominal": {
+          "test_end": null,
+          "test_start": null,
+          "train_end": "2021-12-29",
+          "train_start": "2018-01-01",
+          "valid_end": "2022-12-31",
+          "valid_start": "2022-01-07"
+        },
+        "ok": true,
+        "partition": "discovery",
+        "train": {
+          "effective_train_end": "2021-12-27",
+          "last_label_available": "2021-12-29",
+          "trimmed": true
+        },
+        "valid": {
+          "effective_valid_end": "2022-12-28",
+          "label_unavailable_dates": [],
+          "last_label_available": "2022-12-30",
+          "n_trimmed_dates": 2,
+          "nominal_valid_end": "2022-12-31",
+          "trimmed_dates": [
+            "2022-12-29",
+            "2022-12-30"
+          ]
+        }
+      },
+      "f2024": {
+        "fold_id": "f2024",
+        "future_offset_trading_days": 2,
+        "label_expression": "Ref($close, -2) / Ref($close, -1) - 1",
+        "nominal": {
+          "test_end": null,
+          "test_start": null,
+          "train_end": "2023-12-27",
+          "train_start": "2018-01-01",
+          "valid_end": "2024-12-31",
+          "valid_start": "2024-01-05"
+        },
+        "ok": true,
+        "partition": "confirmation",
+        "train": {
+          "effective_train_end": "2023-12-25",
+          "last_label_available": "2023-12-27",
+          "trimmed": true
+        },
+        "valid": {
+          "effective_valid_end": "2024-12-27",
+          "label_unavailable_dates": [],
+          "last_label_available": "2024-12-31",
+          "n_trimmed_dates": 2,
+          "nominal_valid_end": "2024-12-31",
+          "trimmed_dates": [
+            "2024-12-30",
+            "2024-12-31"
+          ]
+        }
+      },
+      "holdout_2025_2026": {
+        "fold_id": "holdout_2025_2026",
+        "future_offset_trading_days": 2,
+        "label_expression": "Ref($close, -2) / Ref($close, -1) - 1",
+        "nominal": {
+          "test_end": "2026-03-31",
+          "test_start": "2025-09-01",
+          "train_end": "2023-12-27",
+          "train_start": "2018-01-01",
+          "valid_end": "2024-12-31",
+          "valid_start": "2024-01-05"
+        },
+        "ok": true,
+        "partition": "holdout",
+        "test": {
+          "depends_beyond_nominal_test_end": false,
+          "effective_test_end": "2026-03-27",
+          "last_label_available": "2026-03-31",
+          "n_tail_labels_unavailable_dates": 0,
+          "nominal_test_end": "2026-03-31",
+          "tail_labels_unavailable": [],
+          "trimmed_dates": [
+            "2026-03-30",
+            "2026-03-31"
+          ]
+        },
+        "train": {
+          "effective_train_end": "2023-12-25",
+          "last_label_available": "2023-12-27",
+          "trimmed": true
+        },
+        "valid": {
+          "effective_valid_end": "2024-12-27",
+          "label_unavailable_dates": [],
+          "last_label_available": "2024-12-31",
+          "n_trimmed_dates": 2,
+          "nominal_valid_end": "2024-12-31",
+          "trimmed_dates": [
+            "2024-12-30",
+            "2024-12-31"
+          ]
+        }
+      }
+    },
+    "future_offset_trading_days": 2,
+    "label_expression": "Ref($close, -2) / Ref($close, -1) - 1",
+    "ok": true
+  },
+  "label_offset_trading_days": 2,
+  "label_spec_hash": "83ad30b0d05941ee0095537ce92b8ad7c38f60f338062ddd50be9ac3335ecba5",
+  "policy": {
+    "bootstrap_block": 5,
+    "bootstrap_samples": 1000,
+    "fdr_alpha": 0.1,
+    "full_validation_top_k": 4,
+    "generator": "llm",
+    "generator_config": {
+      "enabled": false,
+      "max_composite_depth": 2,
+      "max_tokens": 12000,
+      "mode": "hybrid",
+      "mutation_top_k": 4,
+      "proposals_path": "artifacts/llm_proposal_bank/tsil_hybrid_bank.json",
+      "seed_pool": "paper6+dsl",
+      "temperature": 0.7,
+      "timeout_s": 180
+    },
+    "max_candidates_per_round": 20,
+    "min_control_delta": 0.0,
+    "min_effect": 0.002,
+    "min_fold_coverage": 0.75,
+    "min_screen_effect": 0.0,
+    "min_seed_agreement": 0.5,
+    "min_stability": 0.5,
+    "nw_lag": 5,
+    "require_beat_control": true,
+    "require_positive_ci": true,
+    "save_predictions": true,
+    "screen_folds": [
+      "f2022"
+    ],
+    "seed": 2025,
+    "validation_folds": [
+      "f2020",
+      "f2021"
+    ]
+  },
+  "protocol": {
+    "baseline_variant": "baseline:mse",
+    "confirmation_folds": [
+      {
+        "embargo_days": 3,
+        "fold_id": "f2024",
+        "kind": "time",
+        "metadata": {},
+        "notes": "effective train_end=2023-12-27, valid_start=2024-01-05",
+        "purge_days": 2,
+        "role": "confirmation",
+        "test_end": null,
+        "test_start": null,
+        "train_end": "2023-12-27",
+        "train_start": "2018-01-01",
+        "valid_end": "2024-12-31",
+        "valid_start": "2024-01-05"
+      }
+    ],
+    "confirmation_kind": "time_forward",
+    "control_variant": "control:ones",
+    "control_variants": [],
+    "created_at": "2026-11-08T11:56:13.711093Z",
+    "data_config": {
+      "horizon": 1,
+      "market": "csi300",
+      "provider_uri": "/home/zhengzengrong/.qlib/qlib_data/cn_data",
+      "seq_len": 20
+    },
+    "direction": "higher",
+    "domain": "tsil",
+    "evaluation": {
+      "direction": "higher",
+      "multiple_testing": "benjamini-hochberg",
+      "name": "tsil_rolling_ic",
+      "notes": "daily cross-sectional IC on each validation fold; paired against the MSE baseline trained with identical seeds, data and budget; every candidate must also beat control:ones.",
+      "paired": true,
+      "primary_metric": "ic",
+      "secondary_metrics": [
+        "rank_ic",
+        "icir",
+        "mse"
+      ]
+    },
+    "folds": [
+      {
+        "embargo_days": 3,
+        "fold_id": "f2020",
+        "kind": "time",
+        "metadata": {},
+        "notes": "effective train_end=2019-12-27, valid_start=2020-01-07",
+        "purge_days": 2,
+        "role": "search",
+        "test_end": null,
+        "test_start": null,
+        "train_end": "2019-12-27",
+        "train_start": "2018-01-01",
+        "valid_end": "2020-12-31",
+        "valid_start": "2020-01-07"
+      },
+      {
+        "embargo_days": 3,
+        "fold_id": "f2021",
+        "kind": "time",
+        "metadata": {},
+        "notes": "effective train_end=2020-12-29, valid_start=2021-01-07",
+        "purge_days": 2,
+        "role": "search",
+        "test_end": null,
+        "test_start": null,
+        "train_end": "2020-12-29",
+        "train_start": "2018-01-01",
+        "valid_end": "2021-12-31",
+        "valid_start": "2021-01-07"
+      },
+      {
+        "embargo_days": 3,
+        "fold_id": "f2022",
+        "kind": "time",
+        "metadata": {},
+        "notes": "effective train_end=2021-12-29, valid_start=2022-01-07",
+        "purge_days": 2,
+        "role": "search",
+        "test_end": null,
+        "test_start": null,
+        "train_end": "2021-12-29",
+        "train_start": "2018-01-01",
+        "valid_end": "2022-12-31",
+        "valid_start": "2022-01-07"
+      }
+    ],
+    "holdout_fold": {
+      "embargo_days": 3,
+      "fold_id": "holdout_2025_2026",
+      "kind": "time",
+      "metadata": {
+        "label_future_offset_trading_days": 2,
+        "nominal_test_end": "2026-03-31",
+        "nominal_test_start": "2025-09-01"
+      },
+      "notes": "effective train_end=2023-12-27, valid_start=2024-01-05",
+      "purge_days": 2,
+      "role": "holdout",
+      "test_end": "2026-03-31",
+      "test_start": "2025-09-01",
+      "train_end": "2023-12-27",
+      "train_start": "2018-01-01",
+      "valid_end": "2024-12-31",
+      "valid_start": "2024-01-05"
+    },
+    "model_spec": {
+      "model_config": {
+        "c_out": 1,
+        "d_ff": 16,
+        "d_model": 32,
+        "dropout": 0.1,
+        "e_layers": 2,
+        "enc_in": 158,
+        "factor": 3,
+        "fixed_tau": 0.9,
+        "n_heads": 2,
+        "noise_level": 0.0,
+        "phi_type": "mse",
+        "plot_show": false,
+        "pred_len": 1,
+        "seq_len": 20,
+        "tau_hat_init": 0.0,
+        "tau_mode": "fixed",
+        "use_attn": false
+      },
+      "model_type": "LSTM"
+    },
+    "primary_metric": "ic",
+    "protocol_id": "prot_13ed6d851ceb8e3b",
+    "seeds": [
+      2025,
+      2026
+    ],
+    "task_id": "task-tsil-csi300"
+  },
+  "protocol_hash": "dca3763628dcf96c50962b59eb5ca4a4af960d0a384bf33d174bd78d0202bf05",
+  "run_id": "run_20261108_110259",
+  "snapshot": {
+    "created_at": "2026-11-08T11:56:19.379361Z",
+    "dataset_id": "qlib-cn-csi300",
+    "details": {
+      "calendar_sha256": "3122650e76c96df4cabe029dd52bb4a31f6fec81080f35fa34c57207c6e19e4d",
+      "data_manifest_cache": "artifacts/tsil_tau_k010/_manifests/tsil_csi300_content_manifest.json",
+      "data_manifest_generated_at": "2026-11-08T11:56:18.513637+00:00",
+      "data_manifest_hash": "8c64b2561732ec4ba5e6817380b3ce1193f979b3109997839d7ac62b8008b248",
+      "data_manifest_n_files": 61032,
+      "instruments_sha256": "c3f07c323fe2da962ae740428087860c80e006a6ae40e00134898bc446b138d0",
+      "n_feature_files": 61030,
+      "semantics": {
+        "feature_dim": 158,
+        "horizon": 1,
+        "label": "Ref($close, -2) / Ref($close, -1) - 1",
+        "market": "csi300",
+        "preprocessing_version": "tsil-alpha158-csrank-v1",
+        "seq_len": 20
+      }
+    },
+    "domain": "tsil",
+    "manifest_hash": "96cc5fb17be56224574e6bb41913de08a1a5dcce268e601bd520a2fa39c83f09",
+    "manifest_method": "full per-file sha256 Merkle root (calendar, instruments, all feature files)",
+    "path": "/home/zhengzengrong/.qlib/qlib_data/cn_data",
+    "snapshot_id": "snap_96cc5fb17be56224"
+  },
+  "task_id": "task_99740307a0b68fc3"
+}

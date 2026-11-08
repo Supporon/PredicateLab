@@ -1,0 +1,167 @@
+# tau sweep arm k010 — kernel weight 10%
+# TSIL's fixed_tau IS tau_hat, the coefficient on the I (MSE) term:
+#   loss = tau_hat * e^T I e + (1 - tau_hat) * e^T P e
+# so the kernel weight swept here is 1 - fixed_tau.
+# Predicate bank is held fixed (generator LLM disabled, 20 LLM-designed proposals),
+# rounds=1, so every arm screens the identical candidate set.
+run:
+  name: tsil_tau_k010
+  domain: tsil
+  artifacts_dir: artifacts/tsil_tau_k010
+  db: artifacts/tsil_tau_k010/predicatelab.sqlite
+  rounds: 1
+  require_confirmation: true
+seeds:
+- 2025
+- 2026
+task:
+  title: 'tau-sweep arm k010: LUSI kernel weight 10% — tau_hat=0.9'
+  question: With the LLM proposal bank held byte-identical across arms, does the weight
+    of the LUSI kernel term (tau = 1 - tau_hat) determine whether a predicate beats
+    plain MSE? All arms share folds, LSTM, seeds [2025, 2026] and the training budget;
+    the only difference is tau.
+  hypothesis: 'H1: the kernel term only pays for itself at small weight. The paired
+    effect (candidate minus MSE baseline, f2020/f2021 x 2 seeds) should be monotonically
+    decreasing in the kernel weight, and should only be positive, if ever, at kernel
+    weight <= 0.10. H0: the effect is flat in tau, i.e. the previous negative result
+    is not a tau artefact but a property of the predicate family. Secondary prediction:
+    the learnable-tau_hat arm collapses onto the rank-1 P term (tau_hat -> 0), as
+    documented in model_backbone_phitp.py, and performs worst.'
+data:
+  provider_uri: /home/zhengzengrong/.qlib/qlib_data/cn_data
+  tsil_root: /home/zhengzengrong/PredicateLab/Predicate_Lab_v1.1/TSIL-main
+  market: csi300
+  seq_len: 20
+  horizon: 1
+  feature_dim: 158
+  label: Ref($close, -2) / Ref($close, -1) - 1
+model:
+  seq_len: 20
+  pred_len: 1
+  e_layers: 2
+  factor: 3
+  enc_in: 158
+  c_out: 1
+  d_model: 32
+  d_ff: 16
+  n_heads: 2
+  dropout: 0.1
+  use_attn: false
+  noise_level: 0.0
+  tau_hat_init: 0.0
+  tau_mode: fixed
+  fixed_tau: 0.9
+  plot_show: false
+  phi_type: mse
+training:
+  model_type: LSTM
+  lr: 0.001
+  n_epochs: 20
+  early_stop: 5
+  smooth_steps: 3
+  max_steps_per_epoch: 800
+  batch_size: 800
+  shuffle: true
+  seed: 2025
+  screen:
+    n_epochs: 5
+    early_stop: 2
+    max_steps_per_epoch: 400
+  full:
+    n_epochs: 20
+    early_stop: 5
+    max_steps_per_epoch: 800
+protocol:
+  purge_days: 2
+  embargo_days: 3
+  folds:
+  - id: f2020
+    train:
+    - '2018-01-01'
+    - '2019-12-31'
+    valid:
+    - '2020-01-01'
+    - '2020-12-31'
+  - id: f2021
+    train:
+    - '2018-01-01'
+    - '2020-12-31'
+    valid:
+    - '2021-01-01'
+    - '2021-12-31'
+  - id: f2022
+    train:
+    - '2018-01-01'
+    - '2021-12-31'
+    valid:
+    - '2022-01-01'
+    - '2022-12-31'
+  confirmation_folds:
+  - id: f2024
+    train:
+    - '2018-01-01'
+    - '2023-12-31'
+    valid:
+    - '2024-01-01'
+    - '2024-12-31'
+  confirmation_kind: time_forward
+  holdout:
+    id: holdout_2025_2026
+    train:
+    - '2018-01-01'
+    - '2023-12-31'
+    valid:
+    - '2024-01-01'
+    - '2024-12-31'
+    test:
+    - '2025-09-01'
+    - '2026-03-31'
+evaluation:
+  name: tsil_rolling_ic
+  primary_metric: ic
+  direction: higher
+  secondary_metrics:
+  - rank_ic
+  - icir
+  - mse
+  paired: true
+  multiple_testing: benjamini-hochberg
+  notes: daily cross-sectional IC on each validation fold; paired against the MSE
+    baseline trained with identical seeds, data and budget; every candidate must also
+    beat control:ones.
+search:
+  generator: llm
+  save_predictions: true
+  generator_config:
+    mode: hybrid
+    enabled: false
+    seed_pool: paper6+dsl
+    mutation_top_k: 4
+    max_composite_depth: 2
+    temperature: 0.7
+    max_tokens: 12000
+    timeout_s: 180
+    proposals_path: artifacts/llm_proposal_bank/tsil_hybrid_bank.json
+  max_candidates_per_round: 20
+  screen_folds:
+  - f2022
+  validation_folds:
+  - f2020
+  - f2021
+  full_validation_top_k: 4
+  min_screen_effect: 0.0
+  fdr_alpha: 0.1
+  min_effect: 0.002
+  min_stability: 0.5
+  require_positive_ci: true
+  require_beat_control: true
+  min_control_delta: 0.0
+  bootstrap_samples: 1000
+  bootstrap_block: 5
+  nw_lag: 5
+  seed: 2025
+execution:
+  workers: 3
+  gpu: '0'
+  trial_timeout_s: 5400
+  probe_timeout_s: 1800

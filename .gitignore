@@ -1,17 +1,19 @@
-# --- Python caches ---
+# Python
 __pycache__/
 *.py[cod]
-.pytest_cache/
 *.egg-info/
+.pytest_cache/
 .venv/
 venv/
 
-# --- Experiment outputs ---
+# Experiment outputs (raw, local — the source of truth)
 runs/
 outputs/
 artifacts/
 artifacts_*/
 *.sqlite
+*.sqlite-*
+*.lock
 *.db
 checkpoints/
 *.pth
@@ -19,18 +21,37 @@ checkpoints/
 *.ckpt
 *.log
 
-# --- Data ---
+# Data
 data/
-qlib_bin/
-*.tar.gz
-*.zip
 *.csv
 *.h5
 *.npy
 *.npz
 *.pkl
 
-# --- Editors / OS ---
+# --- Published snapshots (lightweight, safe to commit) ---
+# The rules above hide logs/csv globally; re-include them inside a snapshot.
+!published/**/*.log
+!published/**/*.csv
+!snapshots/**/*.log
+!snapshots/**/*.csv
+# Heavy categories stay out even when a snapshot was built with them.
+published/**/models/
+published/**/data/
+snapshots/**/models/
+snapshots/**/data/
+snapshots/**/*.tar.gz
+snapshots/**/*.zip
+published/**/*.tar.gz
+published/**/*.zip
+
+# Editors / OS
 .idea/
 .vscode/
 .DS_Store
+
+# Local secrets
+.env
+.deepseek_key
+*.key
+

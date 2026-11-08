@@ -1,0 +1,43 @@
+{
+  "experiment": "_root",
+  "files": [
+    "results/probe_bank_report.json"
+  ],
+  "include": [
+    "results",
+    "logs",
+    "figures",
+    "code"
+  ],
+  "kinds": {
+    "code": {
+      "bytes": 0,
+      "files": 0
+    },
+    "data": {
+      "bytes": 0,
+      "files": 0
+    },
+    "figures": {
+      "bytes": 0,
+      "files": 0
+    },
+    "logs": {
+      "bytes": 0,
+      "files": 0
+    },
+    "models": {
+      "bytes": 0,
+      "files": 0
+    },
+    "results": {
+      "bytes": 22983,
+      "files": 1
+    }
+  },
+  "published": {
+    "results": 1
+  },
+  "schema": "predicatelab.snapshot/1",
+  "source": "/home/zhengzengrong/PredicateLab/Predicate_Lab_v1.1/artifacts"
+}

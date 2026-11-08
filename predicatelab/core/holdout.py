@@ -29,6 +29,8 @@ evidence.
 
 from __future__ import annotations
 
+import json
+import os
 import sqlite3
 from datetime import datetime, timezone
 from typing import Any
@@ -37,6 +39,119 @@ from predicatelab.core.hashing import sha256_obj
 
 ACTIVE_STATUSES = ("intent", "claimed", "running", "completed", "failed", "interrupted")
 CONSUMED_STATUSES = ("claimed", "running", "completed", "failed", "interrupted")
+
+# Immutable historical exposure seeds (CSI300 2024-01-01..2025-08-31 holdout
+# and f2023 2023-01-01..2023-12-31 confirmation fold already exposed in V1.0/V1.1).
+# Creating a fresh SQLite DB in a new subdirectory cannot bypass these records.
+BUILTIN_CONSUMED_HOLDOUTS: tuple[dict[str, Any], ...] = (
+    {
+        "access_id": "hoa_builtin_csi300_2024_2025",
+        "holdout_key": "builtin_historical_qlib_cn_csi300_20240101_20250831",
+        "study_id": "task_tsil_csi300_historical_v10_v11",
+        "run_id": "historical_v10_v11_exposed",
+        "candidate_id": "cand_be80bc12ff574b3d",
+        "protocol_hash": "historical_exposed",
+        "snapshot_hash": "snap_14111cf557f10859",
+        "dataset_id": "qlib-cn-csi300",
+        "label_spec_hash": "historical_ref_close_m2_m1",
+        "test_start": "2024-01-01",
+        "test_end": "2025-08-31",
+        "purpose": "confirmatory_final",
+        "status": "completed",
+        "origin": "builtin_historical_seed",
+        "manifest_hash": "historical_exposed_manifest",
+        "code_fingerprint": "historical_exposed",
+        "details": '{"note": "CSI300 2024-01-01..2025-08-31 holdout consumed during V1.0/V1.1 development"}',
+        "created_at": "2026-04-12T00:00:00+00:00",
+        "updated_at": "2026-04-12T00:00:00+00:00",
+    },
+)
+
+BUILTIN_CONSUMED_CONFIRMATIONS: tuple[dict[str, Any], ...] = (
+    {
+        "access_id": "cfa_builtin_csi300_f2023",
+        "confirmation_key": "builtin_historical_qlib_cn_csi300_f2023_20230101_20231231",
+        "study_id": "task_tsil_csi300_historical_v11",
+        "run_id": "historical_v11_quick_exposed",
+        "family_id": "historical_v11_quick_family",
+        "manifest_hash": "historical_v11_quick_manifest",
+        "protocol_hash": "historical_exposed",
+        "snapshot_hash": "snap_14111cf557f10859",
+        "dataset_id": "qlib-cn-csi300",
+        "label_spec_hash": "historical_ref_close_m2_m1",
+        "fold_id": "f2023",
+        "valid_start": "2023-01-01",
+        "valid_end": "2023-12-31",
+        "purpose": "independent_confirmation",
+        "status": "completed",
+        "code_fingerprint": "historical_exposed",
+        "details": '{"note": "CSI300 f2023 2023-01-01..2023-12-31 confirmation fold exposed during V1.1 smoke/quick runs"}',
+        "created_at": "2026-04-12T00:00:00+00:00",
+        "updated_at": "2026-04-12T00:00:00+00:00",
+    },
+)
+
+
+def seed_builtin_exposures(conn: sqlite3.Connection) -> None:
+    """Ensure immutable historical exposure rows exist in a ledger connection."""
+    if os.environ.get("PREDICATELAB_IGNORE_BUILTIN_EXPOSURE") == "1":
+        return
+    with conn:
+        for h in BUILTIN_CONSUMED_HOLDOUTS:
+            conn.execute(
+                """INSERT OR IGNORE INTO holdout_access(
+                       access_id, holdout_key, study_id, run_id, candidate_id, protocol_hash,
+                       snapshot_hash, dataset_id, label_spec_hash, test_start, test_end,
+                       purpose, status, origin, manifest_hash, code_fingerprint, details,
+                       created_at, updated_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    h["access_id"], h["holdout_key"], h["study_id"], h["run_id"],
+                    h["candidate_id"], h["protocol_hash"], h["snapshot_hash"],
+                    h["dataset_id"], h["label_spec_hash"], h["test_start"], h["test_end"],
+                    h["purpose"], h["status"], h["origin"], h["manifest_hash"],
+                    h["code_fingerprint"], h["details"], h["created_at"], h["updated_at"],
+                ),
+            )
+        for c in BUILTIN_CONSUMED_CONFIRMATIONS:
+            conn.execute(
+                """INSERT OR IGNORE INTO confirmation_access(
+                       access_id, confirmation_key, study_id, run_id, family_id, manifest_hash,
+                       protocol_hash, snapshot_hash, dataset_id, label_spec_hash, fold_id,
+                       valid_start, valid_end, purpose, status, code_fingerprint, details,
+                       created_at, updated_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    c["access_id"], c["confirmation_key"], c["study_id"], c["run_id"],
+                    c["family_id"], c["manifest_hash"], c["protocol_hash"],
+                    c["snapshot_hash"], c["dataset_id"], c["label_spec_hash"],
+                    c["fold_id"], c["valid_start"], c["valid_end"],
+                    c["purpose"], c["status"], c["code_fingerprint"],
+                    c["details"], c["created_at"], c["updated_at"],
+                ),
+            )
+
+
+def _match_builtin_holdout(dataset_id: str, test_start: str, test_end: str) -> dict[str, Any] | None:
+    if os.environ.get("PREDICATELAB_IGNORE_BUILTIN_EXPOSURE") == "1":
+        return None
+    if not test_start or not test_end:
+        return None
+    for h in BUILTIN_CONSUMED_HOLDOUTS:
+        if h["dataset_id"] == dataset_id and h["test_start"] <= test_end and h["test_end"] >= test_start:
+            return dict(h)
+    return None
+
+
+def _match_builtin_confirmation(dataset_id: str, valid_start: str, valid_end: str) -> dict[str, Any] | None:
+    if os.environ.get("PREDICATELAB_IGNORE_BUILTIN_EXPOSURE") == "1":
+        return None
+    if not valid_start or not valid_end:
+        return None
+    for c in BUILTIN_CONSUMED_CONFIRMATIONS:
+        if c["dataset_id"] == dataset_id and c["valid_start"] <= valid_end and c["valid_end"] >= valid_start:
+            return dict(c)
+    return None
 
 
 class HoldoutConsumed(RuntimeError):
@@ -151,6 +266,8 @@ def claim_holdout(
                LIMIT 1""" % ",".join("?" for _ in ACTIVE_STATUSES),
             (dataset_id, *ACTIVE_STATUSES, test_end, test_start),
         ).fetchone()
+        if conflict is None:
+            conflict = _match_builtin_holdout(dataset_id, test_start, test_end)
         if conflict is not None:
             raise HoldoutConsumed(
                 f"dataset {dataset_id!r} window {test_start}..{test_end} overlaps an "
@@ -269,6 +386,8 @@ def assert_holdout_available(
            LIMIT 1""" % ",".join("?" for _ in ACTIVE_STATUSES),
         (dataset_id, *ACTIVE_STATUSES, test_end, test_start),
     ).fetchone()
+    if conflict is None:
+        conflict = _match_builtin_holdout(dataset_id, test_start, test_end)
     if conflict is not None and not (
         conflict["run_id"] == run_id and conflict["candidate_id"] == candidate_id
     ):
@@ -351,6 +470,8 @@ def claim_confirmation(
                    LIMIT 1""" % ",".join("?" for _ in ACTIVE_STATUSES),
                 (dataset_id, *ACTIVE_STATUSES, valid_end, valid_start),
             ).fetchone()
+        if row is None and valid_start and valid_end:
+            row = _match_builtin_confirmation(dataset_id, valid_start, valid_end)
 
         if row is not None:
             same = (row["run_id"] == run_id and row["manifest_hash"] == manifest_hash)

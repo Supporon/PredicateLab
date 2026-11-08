@@ -21,6 +21,27 @@ from typing import Any
 import yaml
 
 
+def repo_root() -> Path:
+    """Repository root for the snapshot's ``changes/`` record.
+
+    Prefer the git work tree containing the package; fall back to the package
+    parent so a source checkout still works without git.
+    """
+    candidate = Path(__file__).resolve().parents[1]
+    try:
+        import subprocess
+
+        proc = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=str(candidate), capture_output=True, text=True,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            return Path(proc.stdout.strip())
+    except OSError:
+        pass
+    return candidate
+
+
 def load_config(path: str) -> dict[str, Any]:
     p = Path(path)
     if not p.exists():
@@ -268,6 +289,53 @@ def cmd_export(args) -> int:
     return 0
 
 
+def cmd_publish(args) -> int:
+    from predicatelab.core.artifacts import build_run_snapshot
+
+    cfg = load_config(args.config)
+    run_cfg = cfg.get("run", {}) if isinstance(cfg.get("run"), dict) else {}
+    if args.run_dir:
+        run_dir = Path(args.run_dir)
+    elif args.run_id:
+        run_dir = Path(run_cfg.get("artifacts_dir", "artifacts")) / args.run_id
+    else:
+        raise SystemExit("publish requires --run-id or --run-dir")
+    out = build_run_snapshot(
+        run_dir, Path(args.out),
+        include_models=args.include_models,
+        include_data=args.include_data,
+        include_trial_details=args.include_trial_details,
+        config=cfg,
+        config_path=args.config,
+        repo_root=repo_root(),
+    )
+    print(f"snapshot={out}")
+    print(f"manifest={out / 'MANIFEST.json'}")
+    return 0
+
+
+def cmd_publish_all(args) -> int:
+    from predicatelab.core.artifacts import build_workspace_snapshot
+
+    cfg = load_config(args.config) if args.config else {}
+    run_cfg = cfg.get("run", {}) if isinstance(cfg.get("run"), dict) else {}
+    root = Path(args.artifacts_dir or run_cfg.get("artifacts_dir", "artifacts"))
+    configs_dir = Path(args.configs_dir) if args.configs_dir else None
+    out = build_workspace_snapshot(
+        root, Path(args.out),
+        include_models=args.include_models,
+        include_data=args.include_data,
+        include_trial_details=args.include_trial_details,
+        configs_dir=configs_dir,
+        repo_root=repo_root(),
+        experiments=args.experiment or None,
+    )
+    print(f"snapshot={out}")
+    print(f"index={out / 'INDEX.md'}")
+    print(f"manifest={out / 'MANIFEST.json'}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="predicatelab", description="Predicate discovery & evidence-validation platform")
     sub = p.add_subparsers(dest="command", required=True)
@@ -341,6 +409,34 @@ def build_parser() -> argparse.ArgumentParser:
     ex.add_argument("--out", required=True)
     ex.add_argument("--db", default=None)
     ex.set_defaults(func=cmd_export)
+
+    pub = sub.add_parser("publish", help="build a lightweight snapshot of one run")
+    pub.add_argument("--config", required=True)
+    pub.add_argument("--run-id", default=None)
+    pub.add_argument("--run-dir", default=None)
+    pub.add_argument("--out", required=True)
+    pub.add_argument("--include-models", action="store_true",
+                     help="also copy trained weights (models/)")
+    pub.add_argument("--include-data", action="store_true",
+                     help="also copy predictions, probes and databases (data/)")
+    pub.add_argument("--include-trial-details", action="store_true",
+                     help="also copy per-trial result.json/job.json (bulk)")
+    pub.set_defaults(func=cmd_publish)
+
+    pa = sub.add_parser("publish-all",
+                        help="snapshot every experiment under an artifacts root")
+    pa.add_argument("--config", default=None)
+    pa.add_argument("--artifacts-dir", default=None)
+    pa.add_argument("--out", default="published")
+    pa.add_argument("--configs-dir", default=None,
+                    help="copy *.yaml configs into changes/configs")
+    pa.add_argument("--experiment", action="append", default=None,
+                    help="limit to one experiment directory (repeatable)")
+    pa.add_argument("--include-models", action="store_true")
+    pa.add_argument("--include-data", action="store_true")
+    pa.add_argument("--include-trial-details", action="store_true",
+                    help="also copy per-trial result.json/job.json (bulk)")
+    pa.set_defaults(func=cmd_publish_all)
     return p
 
 

@@ -1,0 +1,45 @@
+{
+  "experiment": "llm_proposal_bank",
+  "files": [
+    "results/tsil_dsl_composite_bank.json",
+    "results/tsil_hybrid_bank.json",
+    "results/tsil_novel_symbolic_bank.json"
+  ],
+  "include": [
+    "results",
+    "logs",
+    "figures",
+    "code"
+  ],
+  "kinds": {
+    "code": {
+      "bytes": 0,
+      "files": 0
+    },
+    "data": {
+      "bytes": 0,
+      "files": 0
+    },
+    "figures": {
+      "bytes": 0,
+      "files": 0
+    },
+    "logs": {
+      "bytes": 0,
+      "files": 0
+    },
+    "models": {
+      "bytes": 0,
+      "files": 0
+    },
+    "results": {
+      "bytes": 56826,
+      "files": 3
+    }
+  },
+  "published": {
+    "results": 3
+  },
+  "schema": "predicatelab.snapshot/1",
+  "source": "/home/zhengzengrong/PredicateLab/Predicate_Lab_v1.1/artifacts/llm_proposal_bank"
+}

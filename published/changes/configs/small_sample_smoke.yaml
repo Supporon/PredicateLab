@@ -1,0 +1,81 @@
+# Small-sample scenario: fast end-to-end smoke.
+#
+# n=96 with a known sign-interaction signal.  This exercises the full
+# discovery -> freeze-family -> confirm -> finalize lifecycle on very small
+# folds.  It is a mechanical/scientific smoke, not a headline result: read
+# docs/small_sample_scenario.md before interpreting the numbers.
+run:
+  name: small_sample_smoke
+  domain: small_sample
+  artifacts_dir: artifacts_small_sample
+  db: artifacts_small_sample/smoke.sqlite
+  # Synthetic scenario: keep the one-time confirmation ledger inside the
+  # scenario directory so `rm -rf artifacts_small_sample` fully resets the run.
+  global_ledger_db: artifacts_small_sample/smoke_ledger.sqlite
+  rounds: 1
+  require_confirmation: true
+  warning_acknowledgements: all
+  warning_ack_reason: >-
+    Pre-registered small-sample scenario: low statistical power at n=96 is the
+    phenomenon under study, not a data defect.
+
+seeds: [2025]
+task:
+  title: Small-sample smoke run (n=96, known sign-interaction signal)
+  question: Does the full lifecycle execute and behave sensibly when every fold has very few samples?
+  hypothesis: A strong sign-interaction signal is recoverable at n=96, but confirmation is fragile.
+
+data:
+  generator: signal_sign_interaction
+  seed: 20261108
+  n_samples: 96
+  n_features: 8
+  signal_strength: 4.0
+  threshold_quantile: 0.75
+  class_balance: 0.5
+  holdout_fraction: 0.25
+  discovery_fraction: 0.65
+  confirmation_mode: independent
+
+training:
+  seed: 2025
+  C: 1.0
+  max_iter: 5000
+
+protocol:
+  cv_splits: 4
+  cv_repeats: 1
+  discovery_repeats: 1
+  confirmation_splits: 3
+
+evaluation:
+  name: small_sample_brier
+  primary_metric: neg_brier
+  direction: higher
+  secondary_metrics: [auc, accuracy, log_loss]
+  paired: true
+  multiple_testing: benjamini-hochberg
+  notes: per-sample paired Brier improvement; i.i.d. samples, nw_lag=0, block bootstrap=1
+
+search:
+  generator: rule
+  save_predictions: true
+  max_candidates_per_round: 24
+  screen_folds: [d0_f0]
+  validation_folds: [d0_f1, d0_f2, d0_f3]
+  full_validation_top_k: 3
+  min_screen_effect: 0.0
+  fdr_alpha: 0.10
+  min_effect: 0.0025
+  min_stability: 0.60
+  min_fold_coverage: 0.75
+  min_seed_agreement: 0.50
+  require_positive_ci: true
+  require_beat_control: true
+  bootstrap_samples: 500
+  bootstrap_block: 1
+  nw_lag: 0
+  seed: 2025
+
+execution:
+  workers: 1

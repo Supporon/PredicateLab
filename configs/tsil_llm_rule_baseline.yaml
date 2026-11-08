@@ -1,0 +1,154 @@
+run:
+  name: tsil_llm_rule_baseline
+  domain: tsil
+  artifacts_dir: artifacts/tsil_llm_rule_baseline
+  db: artifacts/tsil_llm_rule_baseline/predicatelab.sqlite
+  rounds: 2
+  require_confirmation: true
+seeds:
+- 2025
+- 2026
+task:
+  title: 'Arm-D (control): deterministic rule-based DSL search, no LLM proposals'
+  question: Under an identical LSTM, identical folds and an identical training budget,
+    do LLM-constructed predicates (novel symbolic tensor formulas and DSL compositions)
+    improve daily cross-sectional IC relative to plain MSE, the Phi_ones control,
+    and a deterministic rule-based DSL search?
+  hypothesis: Predicates that encode path efficiency, downside semivariance and lead-lag
+    price-volume structure should align residual co-movement of economically similar
+    assets better than a plain MSE loss, and more so than the ones kernel.
+data:
+  provider_uri: /home/zhengzengrong/.qlib/qlib_data/cn_data
+  tsil_root: /home/zhengzengrong/PredicateLab/Predicate_Lab_v1.1/TSIL-main
+  market: csi300
+  seq_len: 20
+  horizon: 1
+  feature_dim: 158
+  label: Ref($close, -2) / Ref($close, -1) - 1
+model:
+  seq_len: 20
+  pred_len: 1
+  e_layers: 2
+  factor: 3
+  enc_in: 158
+  c_out: 1
+  d_model: 32
+  d_ff: 16
+  n_heads: 2
+  dropout: 0.1
+  use_attn: false
+  noise_level: 0.0
+  tau_hat_init: 0.0
+  tau_mode: fixed
+  fixed_tau: 0.5
+  plot_show: false
+  phi_type: mse
+training:
+  model_type: LSTM
+  lr: 0.001
+  n_epochs: 20
+  early_stop: 5
+  smooth_steps: 3
+  max_steps_per_epoch: 800
+  batch_size: 800
+  shuffle: true
+  seed: 2025
+  screen:
+    n_epochs: 5
+    early_stop: 2
+    max_steps_per_epoch: 400
+  full:
+    n_epochs: 20
+    early_stop: 5
+    max_steps_per_epoch: 800
+protocol:
+  purge_days: 2
+  embargo_days: 3
+  folds:
+  - id: f2020
+    train:
+    - '2018-01-01'
+    - '2019-12-31'
+    valid:
+    - '2020-01-01'
+    - '2020-12-31'
+  - id: f2021
+    train:
+    - '2018-01-01'
+    - '2020-12-31'
+    valid:
+    - '2021-01-01'
+    - '2021-12-31'
+  - id: f2022
+    train:
+    - '2018-01-01'
+    - '2021-12-31'
+    valid:
+    - '2022-01-01'
+    - '2022-12-31'
+  confirmation_folds:
+  - id: f2024
+    train:
+    - '2018-01-01'
+    - '2023-12-31'
+    valid:
+    - '2024-01-01'
+    - '2024-12-31'
+  confirmation_kind: time_forward
+  holdout:
+    id: holdout_2025_2026
+    train:
+    - '2018-01-01'
+    - '2023-12-31'
+    valid:
+    - '2024-01-01'
+    - '2024-12-31'
+    test:
+    - '2025-09-01'
+    - '2026-03-31'
+evaluation:
+  name: tsil_rolling_ic
+  primary_metric: ic
+  direction: higher
+  secondary_metrics:
+  - rank_ic
+  - icir
+  - mse
+  paired: true
+  multiple_testing: benjamini-hochberg
+  notes: daily cross-sectional IC on each validation fold; paired against the MSE
+    baseline trained with identical seeds, data and budget; every candidate must also
+    beat control:ones.
+search:
+  generator: rule
+  save_predictions: true
+  generator_config:
+    seed_pool: paper6+dsl
+    mutation_top_k: 4
+    max_composite_depth: 2
+    temperature: 0.7
+    max_tokens: 12000
+    timeout_s: 180
+  max_candidates_per_round: 20
+  screen_folds:
+  - f2022
+  validation_folds:
+  - f2020
+  - f2021
+  full_validation_top_k: 4
+  min_screen_effect: 0.0
+  fdr_alpha: 0.1
+  min_effect: 0.002
+  min_stability: 0.5
+  require_positive_ci: true
+  require_beat_control: true
+  min_control_delta: 0.0
+  bootstrap_samples: 1000
+  bootstrap_block: 5
+  nw_lag: 5
+  seed: 2025
+execution:
+  workers: 4
+  gpu: '0'
+  trial_timeout_s: 5400
+  probe_timeout_s: 1800

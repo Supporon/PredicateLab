@@ -1,0 +1,69 @@
+# V1.1 end-to-end pipeline smoke on development data.
+#
+# This config is a *mechanical* end-to-end check of the V1.1 state machine
+# (discovery -> freeze-family -> confirm -> finalize) on an independent,
+# non-TSIL dataset.  The statistical gates are deliberately relaxed so that
+# the confirmation/finalize path is exercised; results from this run are
+# NOT scientific evidence and must not be reported as such.
+#
+# It writes only to artifacts_v11_dev/ and never touches the TSIL holdout.
+run:
+  name: tabular_v11_dev_smoke
+  domain: tabular
+  artifacts_dir: artifacts_v11_dev_e2e
+  db: artifacts_v11_dev_e2e/predicatelab.sqlite
+  rounds: 1
+  require_confirmation: true
+
+seeds: [2025, 2026, 2027]
+task:
+  title: V1.1 end-to-end pipeline smoke on development tabular data
+  question: Does the V1.1 lifecycle (discovery, frozen family, confirmation,
+    one-time holdout) execute end-to-end on a non-TSIL dataset?
+  hypothesis: Pipeline mechanics only; the relaxed gates mean the answer carries
+    no scientific weight.
+data:
+  dataset: sklearn-breast-cancer
+training:
+  seed: 2025
+protocol:
+  cv_splits: 5
+  cv_repeats: 2
+  discovery_repeats: 1
+  confirmation_kind: resampling
+evaluation:
+  name: tabular_cv_logloss
+  primary_metric: log_loss
+  direction: lower
+  secondary_metrics:
+  - auc
+  - accuracy
+  paired: true
+  multiple_testing: benjamini-hochberg
+  notes: dev smoke only; gates relaxed to exercise the lifecycle
+search:
+  generator: rule
+  save_predictions: true
+  generator_config:
+    mutation_top_k: 2
+  max_candidates_per_round: 6
+  screen_folds:
+  - cv_r0_f0
+  # Screening and validation folds are disjoint: a fold that promoted a
+  # candidate may not also provide its "independent" validation effect.
+  validation_folds:
+  - cv_r0_f1
+  - cv_r0_f2
+  - cv_r0_f3
+  - cv_r0_f4
+  full_validation_top_k: 2
+  min_screen_effect: -1000000000.0
+  fdr_alpha: 1.0
+  min_effect: -1.0
+  min_stability: 0.0
+  bootstrap_samples: 500
+  bootstrap_block: 1
+  nw_lag: 0
+  seed: 2025
+execution:
+  workers: 1

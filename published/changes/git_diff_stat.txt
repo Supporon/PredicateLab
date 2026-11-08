@@ -1,0 +1,20 @@
+ .gitignore                                |   24 +-
+ README.md                                 |   29 +
+ docs/code_guide.md                        |    9 +
+ predicatelab/cli.py                       |   96 +++
+ predicatelab/core/engine.py               |  568 ++++++++++++-
+ predicatelab/core/holdout.py              |  121 +++
+ predicatelab/core/schema.py               |   14 +-
+ predicatelab/core/stats.py                |  124 +++
+ predicatelab/core/store.py                |  153 +++-
+ predicatelab/domains/__init__.py          |   12 +-
+ predicatelab/domains/tabular/adapter.py   |  516 ++++++++++--
+ predicatelab/domains/tabular/generator.py |   99 ++-
+ predicatelab/domains/tsil/adapter.py      |   80 +-
+ predicatelab/domains/tsil/dsl.py          |  593 +++++++++++++-
+ predicatelab/domains/tsil/generator.py    | 1243 ++++++++++++++++++++++++++---
+ predicatelab/domains/tsil/seeds.py        |   14 +
+ predicatelab/domains/tsil/worker.py       |  227 +++++-
+ tests/test_adversarial_holdout.py         |  117 +++
+ tests/test_reserved_domains.py            |    2 +-
+ 19 files changed, 3808 insertions(+), 233 deletions(-)

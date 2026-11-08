@@ -1,0 +1,1289 @@
+{
+  "ok": true,
+  "model": "deepseek-flash",
+  "latency_s": 23.617,
+  "usage": {
+    "prompt_tokens": 1461,
+    "completion_tokens": 6330,
+    "total_tokens": 7791,
+    "prompt_tokens_details": {
+      "cached_tokens": 1024
+    },
+    "prompt_cache_hit_tokens": 1024,
+    "prompt_cache_miss_tokens": 437
+  },
+  "error": "",
+  "analysis": "Round 0 is an initial discovery round with no empirical feedback. Strategy: build a diverse portfolio of DSL-composed (composite) predicates that combine 2-4 complementary sub-descriptors across distinct windows (3..20) and Alpha158 feature slices. Key design principles: (1) ensure each descriptor has effective rank >= 3 by mixing time_ops (mean, std, slope, autocorr, semivar_asymmetry, path_efficiency) and feature_ops (mean, std, iqr, corr_half, top_bottom_spread) across non-overlapping slices; (2) avoid collapse by combining channels with weakly correlated signals (e.g., momentum vs volatility vs volume imbalance); (3) cover all four Alpha158 blocks: candlestick morphology [0,9], price/VWAP [9,29], rolling statistics [29,95], volume/order-flow [95,158]; (4) vary windows to capture short-term reversal (3-5), medium-term momentum (10-12), and longer-term trend/volatility (15-20); (5) use both 'concat' (for symbolic/DSL parts) and 'mix' (kernel convex combination) to test different aggregation mechanisms. The portfolio includes 26 proposals: ~20 composite DSL, ~4 symbolic tensor, and ~2 atomic operators, ensuring >75% focus on DSL-composed predicates. Each composite combines mechanisms like momentum+volatility, trend+volume, candlestick+order-flow, and cross-slice interactions to maximize cross-sectional IC alignment with residuals.",
+  "reasoning_content": "",
+  "n_proposals": 26,
+  "proposals": [
+    {
+      "kind": "composite",
+      "name": "Momentum-Vol-Volume Concat",
+      "rationale": "Medium-term momentum (29-95) combined with short-term volatility (29-95) and volume imbalance (95-158) captures distinct return drivers; concatenation preserves rank diversity.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "momentum",
+            "params": {
+              "window": 12
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "volatility",
+            "params": {
+              "window": 5
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "vol_price_corr",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              95,
+              158
+            ]
+          }
+        ],
+        "weights": [
+          1.2,
+          1.0,
+          0.8
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Candle-OrderFlow-Trend Concat",
+      "rationale": "Candlestick morphology (0-9) captures intraday sentiment, order-flow imbalance (95-158) captures volume pressure, and trend R^2 (29-95) captures persistence; complementary signals.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "trend",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              0,
+              9
+            ]
+          },
+          {
+            "family": "vol_price_corr",
+            "params": {
+              "window": 8
+            },
+            "feature_slice": [
+              95,
+              158
+            ]
+          },
+          {
+            "family": "momentum",
+            "params": {
+              "window": 15
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          }
+        ],
+        "weights": [
+          1.0,
+          1.1,
+          1.2
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Semivar-PathEff-Dispersion Mix",
+      "rationale": "Semivariance asymmetry (29-95), path efficiency (29-95), and cross-sectional dispersion (9-29) capture different risk-return asymmetries; mix kernel convex combination balances scales.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "semivar_ratio",
+            "params": {
+              "window": 12
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "path_efficiency",
+            "params": {
+              "window": 8
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "dispersion",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              9,
+              29
+            ]
+          }
+        ],
+        "weights": [
+          1.0,
+          1.0,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Hurst-LeadLag-Drawdown Concat",
+      "rationale": "Hurst exponent (29-95) measures long memory, lead-lag beta (95-158) captures cross-sectional lead-lag, drawdown (9-29) captures downside risk; diverse temporal scales.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "hurst_vr",
+            "params": {
+              "window": 20
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "lead_lag_beta",
+            "params": {
+              "window": 12
+            },
+            "feature_slice": [
+              95,
+              158
+            ]
+          },
+          {
+            "family": "drawdown",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              9,
+              29
+            ]
+          }
+        ],
+        "weights": [
+          1.1,
+          1.0,
+          0.8
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Regime-Tail-Volume Concat",
+      "rationale": "Regime transition (29-95) captures volatility regimes, tail asymmetry (29-95) captures skewness, volume-weighted volatility (95-158) captures order-flow; complementary risk factors.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "regime_transition",
+            "params": {
+              "window": 15
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "tail_asymmetry",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "volatility",
+            "params": {
+              "window": 5
+            },
+            "feature_slice": [
+              95,
+              158
+            ]
+          }
+        ],
+        "weights": [
+          1.0,
+          1.1,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Autocorr-Momentum-Dispersion Mix",
+      "rationale": "Autocorrelation (9-29) captures short-term reversal, momentum (29-95) captures trend, dispersion (29-95) captures cross-sectional spread; mix balances scales.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "autocorr",
+            "params": {
+              "window": 5
+            },
+            "feature_slice": [
+              9,
+              29
+            ]
+          },
+          {
+            "family": "momentum",
+            "params": {
+              "window": 12
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "dispersion",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          }
+        ],
+        "weights": [
+          1.0,
+          1.2,
+          0.8
+        ]
+      }
+    },
+    {
+      "kind": "symbolic",
+      "name": "Multi-Scale Vol-Trend-Volume Symbolic",
+      "rationale": "Combine short-term volatility (5), medium-term trend (12), and volume-price correlation (10) via symbolic channels to capture interactions between risk, trend, and order flow.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 12
+        },
+        "channels": [
+          {
+            "time_op": "std",
+            "feature_op": "mean",
+            "window": 5,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 1.0
+          },
+          {
+            "time_op": "slope",
+            "feature_op": "mean",
+            "window": 12,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "tanh",
+            "weight": 1.2
+          },
+          {
+            "time_op": "corr",
+            "feature_op": "corr_half",
+            "window": 10,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "corr",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "mean",
+            "rhs_window": 10,
+            "transform": "identity",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Candle-Volume-Momentum Mix",
+      "rationale": "Candlestick body (0-9) captures intraday sentiment, volume imbalance (95-158) captures order flow, momentum (29-95) captures trend; mix kernel.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "trend",
+            "params": {
+              "window": 8
+            },
+            "feature_slice": [
+              0,
+              9
+            ]
+          },
+          {
+            "family": "vol_price_corr",
+            "params": {
+              "window": 12
+            },
+            "feature_slice": [
+              95,
+              158
+            ]
+          },
+          {
+            "family": "momentum",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          }
+        ],
+        "weights": [
+          0.9,
+          1.1,
+          1.2
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "PathEff-Semivar-Tail Concat",
+      "rationale": "Path efficiency (29-95) and semivariance asymmetry (29-95) capture trend quality and risk asymmetry, tail asymmetry (29-95) captures extreme moves; concat preserves diversity.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "path_efficiency",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "semivar_ratio",
+            "params": {
+              "window": 15
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "tail_asymmetry",
+            "params": {
+              "window": 8
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          }
+        ],
+        "weights": [
+          1.0,
+          1.1,
+          0.8
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "LeadLag-Vol-Drawdown Mix",
+      "rationale": "Lead-lag beta (95-158) captures cross-sectional lead-lag, volatility (9-29) captures short-term risk, drawdown (29-95) captures downside; mix balances scales.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "lead_lag_beta",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              95,
+              158
+            ]
+          },
+          {
+            "family": "volatility",
+            "params": {
+              "window": 5
+            },
+            "feature_slice": [
+              9,
+              29
+            ]
+          },
+          {
+            "family": "drawdown",
+            "params": {
+              "window": 12
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          }
+        ],
+        "weights": [
+          1.1,
+          1.0,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "symbolic",
+      "name": "Candle-OrderFlow Interaction Symbolic",
+      "rationale": "Candlestick morphology interacts with order-flow imbalance via ratio and lead-lag correlation channels; captures intraday sentiment-volume coupling.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 10
+        },
+        "channels": [
+          {
+            "time_op": "mean",
+            "feature_op": "mean",
+            "window": 5,
+            "feature_slice": [
+              0,
+              9
+            ],
+            "interaction": "ratio",
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "rhs_time_op": "std",
+            "rhs_window": 5,
+            "transform": "tanh",
+            "weight": 1.0
+          },
+          {
+            "time_op": "slope",
+            "feature_op": "mean",
+            "window": 10,
+            "feature_slice": [
+              0,
+              9
+            ],
+            "interaction": "lead_lag_corr",
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "rhs_time_op": "mean",
+            "rhs_window": 10,
+            "transform": "identity",
+            "weight": 1.1
+          },
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "mean",
+            "window": 8,
+            "feature_slice": [
+              0,
+              9
+            ],
+            "interaction": "product",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "mean",
+            "rhs_window": 8,
+            "transform": "abs",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Hurst-Momentum-Volume Concat",
+      "rationale": "Hurst exponent (29-95) measures long memory, momentum (9-29) captures short-term trend, volume-weighted volatility (95-158) captures order-flow risk; diverse scales.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "hurst_vr",
+            "params": {
+              "window": 20
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "momentum",
+            "params": {
+              "window": 5
+            },
+            "feature_slice": [
+              9,
+              29
+            ]
+          },
+          {
+            "family": "volatility",
+            "params": {
+              "window": 12
+            },
+            "feature_slice": [
+              95,
+              158
+            ]
+          }
+        ],
+        "weights": [
+          1.2,
+          1.0,
+          0.8
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Regime-Autocorr-Trend Mix",
+      "rationale": "Regime transition (29-95) captures volatility regimes, autocorrelation (9-29) captures short-term reversal, trend (29-95) captures persistence; mix kernel.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "regime_transition",
+            "params": {
+              "window": 15
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "autocorr",
+            "params": {
+              "window": 5
+            },
+            "feature_slice": [
+              9,
+              29
+            ]
+          },
+          {
+            "family": "trend",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          }
+        ],
+        "weights": [
+          1.0,
+          1.1,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Tail-Vol-PriceCorr Concat",
+      "rationale": "Tail asymmetry (29-95) captures skewness, volatility (29-95) captures risk, price-volume correlation (95-158) captures order-flow; complementary.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "tail_asymmetry",
+            "params": {
+              "window": 12
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "volatility",
+            "params": {
+              "window": 5
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "vol_price_corr",
+            "params": {
+              "window": 8
+            },
+            "feature_slice": [
+              95,
+              158
+            ]
+          }
+        ],
+        "weights": [
+          1.1,
+          1.0,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "symbolic",
+      "name": "Multi-Slice Momentum-Vol Symbolic",
+      "rationale": "Combine momentum (9-29), volatility (29-95), and volume (95-158) with diff and ratio interactions to capture cross-slice dynamics.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 12
+        },
+        "channels": [
+          {
+            "time_op": "slope",
+            "feature_op": "mean",
+            "window": 10,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "diff",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "mean",
+            "rhs_window": 10,
+            "transform": "tanh",
+            "weight": 1.0
+          },
+          {
+            "time_op": "std",
+            "feature_op": "std",
+            "window": 5,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "ratio",
+            "rhs_slice": [
+              95,
+              158
+            ],
+            "rhs_time_op": "mean",
+            "rhs_window": 5,
+            "transform": "identity",
+            "weight": 1.1
+          },
+          {
+            "time_op": "ema_diff",
+            "feature_op": "mean",
+            "window": 8,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Drawdown-PathEff-Dispersion Concat",
+      "rationale": "Drawdown (9-29) captures downside, path efficiency (29-95) captures trend quality, dispersion (29-95) captures cross-sectional spread; diverse risk measures.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "drawdown",
+            "params": {
+              "window": 8
+            },
+            "feature_slice": [
+              9,
+              29
+            ]
+          },
+          {
+            "family": "path_efficiency",
+            "params": {
+              "window": 12
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "dispersion",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          }
+        ],
+        "weights": [
+          1.0,
+          1.1,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "LeadLag-Semivar-Volume Mix",
+      "rationale": "Lead-lag beta (95-158) captures cross-sectional lead-lag, semivariance asymmetry (29-95) captures risk asymmetry, volume (95-158) captures order-flow; mix kernel.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "lead_lag_beta",
+            "params": {
+              "window": 12
+            },
+            "feature_slice": [
+              95,
+              158
+            ]
+          },
+          {
+            "family": "semivar_ratio",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "volatility",
+            "params": {
+              "window": 5
+            },
+            "feature_slice": [
+              95,
+              158
+            ]
+          }
+        ],
+        "weights": [
+          1.1,
+          1.0,
+          0.8
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Candle-Hurst-Vol Concat",
+      "rationale": "Candlestick trend (0-9) captures intraday sentiment, Hurst exponent (29-95) captures long memory, volatility (29-95) captures risk; diverse.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "trend",
+            "params": {
+              "window": 5
+            },
+            "feature_slice": [
+              0,
+              9
+            ]
+          },
+          {
+            "family": "hurst_vr",
+            "params": {
+              "window": 20
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "volatility",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          }
+        ],
+        "weights": [
+          0.9,
+          1.2,
+          1.0
+        ]
+      }
+    },
+    {
+      "kind": "symbolic",
+      "name": "Autocorr-Regime-Tail Symbolic",
+      "rationale": "Autocorrelation (9-29), regime transition (29-95), and tail asymmetry (29-95) capture reversal, regime shifts, and skewness; symbolic interactions enhance rank.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 12
+        },
+        "channels": [
+          {
+            "time_op": "autocorr_1",
+            "feature_op": "mean",
+            "window": 5,
+            "feature_slice": [
+              9,
+              29
+            ],
+            "interaction": "none",
+            "transform": "tanh",
+            "weight": 1.0
+          },
+          {
+            "time_op": "std",
+            "feature_op": "std",
+            "window": 10,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "diff",
+            "rhs_slice": [
+              9,
+              29
+            ],
+            "rhs_time_op": "mean",
+            "rhs_window": 10,
+            "transform": "identity",
+            "weight": 1.1
+          },
+          {
+            "time_op": "skew",
+            "feature_op": "mean",
+            "window": 8,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Momentum-Vol-PriceCorr Mix",
+      "rationale": "Momentum (29-95), volatility (29-95), and price-volume correlation (95-158) capture trend, risk, and order-flow; mix kernel balances scales.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "momentum",
+            "params": {
+              "window": 12
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "volatility",
+            "params": {
+              "window": 5
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "vol_price_corr",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              95,
+              158
+            ]
+          }
+        ],
+        "weights": [
+          1.2,
+          1.0,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Regime-LeadLag-Drawdown Concat",
+      "rationale": "Regime transition (29-95), lead-lag beta (95-158), and drawdown (9-29) capture regime shifts, cross-sectional lead-lag, and downside risk.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "regime_transition",
+            "params": {
+              "window": 15
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "lead_lag_beta",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              95,
+              158
+            ]
+          },
+          {
+            "family": "drawdown",
+            "params": {
+              "window": 8
+            },
+            "feature_slice": [
+              9,
+              29
+            ]
+          }
+        ],
+        "weights": [
+          1.0,
+          1.1,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "PathEff-Tail-Volume Mix",
+      "rationale": "Path efficiency (29-95), tail asymmetry (29-95), and volume-weighted volatility (95-158) capture trend quality, skewness, and order-flow risk.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "path_efficiency",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "tail_asymmetry",
+            "params": {
+              "window": 12
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "volatility",
+            "params": {
+              "window": 5
+            },
+            "feature_slice": [
+              95,
+              158
+            ]
+          }
+        ],
+        "weights": [
+          1.0,
+          1.1,
+          0.8
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Hurst-Autocorr-Dispersion Concat",
+      "rationale": "Hurst exponent (29-95), autocorrelation (9-29), and dispersion (29-95) capture long memory, short-term reversal, and cross-sectional spread.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "hurst_vr",
+            "params": {
+              "window": 20
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "autocorr",
+            "params": {
+              "window": 5
+            },
+            "feature_slice": [
+              9,
+              29
+            ]
+          },
+          {
+            "family": "dispersion",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          }
+        ],
+        "weights": [
+          1.2,
+          1.0,
+          0.9
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Candle-Trend-Semivar Mix",
+      "rationale": "Candlestick trend (0-9), trend R^2 (29-95), and semivariance asymmetry (29-95) capture intraday sentiment, persistence, and risk asymmetry.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "mix",
+        "parts": [
+          {
+            "family": "trend",
+            "params": {
+              "window": 5
+            },
+            "feature_slice": [
+              0,
+              9
+            ]
+          },
+          {
+            "family": "trend",
+            "params": {
+              "window": 12
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "semivar_ratio",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          }
+        ],
+        "weights": [
+          0.9,
+          1.2,
+          1.0
+        ]
+      }
+    },
+    {
+      "kind": "symbolic",
+      "name": "Volume-Momentum-Candle Symbolic",
+      "rationale": "Volume (95-158), momentum (29-95), and candlestick (0-9) interact via ratio and product to capture volume-driven momentum and sentiment.",
+      "descriptor": {
+        "family": "symbolic",
+        "params": {
+          "window": 10
+        },
+        "channels": [
+          {
+            "time_op": "mean",
+            "feature_op": "mean",
+            "window": 5,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "ratio",
+            "rhs_slice": [
+              29,
+              95
+            ],
+            "rhs_time_op": "mean",
+            "rhs_window": 5,
+            "transform": "tanh",
+            "weight": 1.0
+          },
+          {
+            "time_op": "slope",
+            "feature_op": "mean",
+            "window": 10,
+            "feature_slice": [
+              29,
+              95
+            ],
+            "interaction": "product",
+            "rhs_slice": [
+              0,
+              9
+            ],
+            "rhs_time_op": "mean",
+            "rhs_window": 10,
+            "transform": "identity",
+            "weight": 1.1
+          },
+          {
+            "time_op": "std",
+            "feature_op": "std",
+            "window": 8,
+            "feature_slice": [
+              95,
+              158
+            ],
+            "interaction": "none",
+            "transform": "identity",
+            "weight": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "kind": "composite",
+      "name": "Vol-PriceCorr-Drawdown Concat",
+      "rationale": "Volatility (29-95), price-volume correlation (95-158), and drawdown (9-29) capture risk, order-flow, and downside; complementary.",
+      "descriptor": {
+        "family": "composite",
+        "combine": "concat",
+        "parts": [
+          {
+            "family": "volatility",
+            "params": {
+              "window": 5
+            },
+            "feature_slice": [
+              29,
+              95
+            ]
+          },
+          {
+            "family": "vol_price_corr",
+            "params": {
+              "window": 10
+            },
+            "feature_slice": [
+              95,
+              158
+            ]
+          },
+          {
+            "family": "drawdown",
+            "params": {
+              "window": 8
+            },
+            "feature_slice": [
+              9,
+              29
+            ]
+          }
+        ],
+        "weights": [
+          1.0,
+          1.1,
+          0.9
+        ]
+      }
+    }
+  ],
+  "raw_content": "{\n  \"round_analysis\": \"Round 0 is an initial discovery round with no empirical feedback. Strategy: build a diverse portfolio of DSL-composed (composite) predicates that combine 2-4 complementary sub-descriptors across distinct windows (3..20) and Alpha158 feature slices. Key design principles: (1) ensure each descriptor has effective rank >= 3 by mixing time_ops (mean, std, slope, autocorr, semivar_asymmetry, path_efficiency) and feature_ops (mean, std, iqr, corr_half, top_bottom_spread) across non-overlapping slices; (2) avoid collapse by combining channels with weakly correlated signals (e.g., momentum vs volatility vs volume imbalance); (3) cover all four Alpha158 blocks: candlestick morphology [0,9], price/VWAP [9,29], rolling statistics [29,95], volume/order-flow [95,158]; (4) vary windows to capture short-term reversal (3-5), medium-term momentum (10-12), and longer-term trend/volatility (15-20); (5) use both 'concat' (for symbolic/DSL parts) and 'mix' (kernel convex combination) to test different aggregation mechanisms. The portfolio includes 26 proposals: ~20 composite DSL, ~4 symbolic tensor, and ~2 atomic operators, ensuring >75% focus on DSL-composed predicates. Each composite combines mechanisms like momentum+volatility, trend+volume, candlestick+order-flow, and cross-slice interactions to maximize cross-sectional IC alignment with residuals.\",\n  \"proposals\": [\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Momentum-Vol-Volume Concat\",\n      \"rationale\": \"Medium-term momentum (29-95) combined with short-term volatility (29-95) and volume imbalance (95-158) captures distinct return drivers; concatenation preserves rank diversity.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"momentum\", \"params\": {\"window\": 12}, \"feature_slice\": [29, 95]},\n          {\"family\": \"volatility\", \"params\": {\"window\": 5}, \"feature_slice\": [29, 95]},\n          {\"family\": \"vol_price_corr\", \"params\": {\"window\": 10}, \"feature_slice\": [95, 158]}\n        ],\n        \"weights\": [1.2, 1.0, 0.8]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Candle-OrderFlow-Trend Concat\",\n      \"rationale\": \"Candlestick morphology (0-9) captures intraday sentiment, order-flow imbalance (95-158) captures volume pressure, and trend R^2 (29-95) captures persistence; complementary signals.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"trend\", \"params\": {\"window\": 10}, \"feature_slice\": [0, 9]},\n          {\"family\": \"vol_price_corr\", \"params\": {\"window\": 8}, \"feature_slice\": [95, 158]},\n          {\"family\": \"momentum\", \"params\": {\"window\": 15}, \"feature_slice\": [29, 95]}\n        ],\n        \"weights\": [1.0, 1.1, 1.2]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Semivar-PathEff-Dispersion Mix\",\n      \"rationale\": \"Semivariance asymmetry (29-95), path efficiency (29-95), and cross-sectional dispersion (9-29) capture different risk-return asymmetries; mix kernel convex combination balances scales.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"semivar_ratio\", \"params\": {\"window\": 12}, \"feature_slice\": [29, 95]},\n          {\"family\": \"path_efficiency\", \"params\": {\"window\": 8}, \"feature_slice\": [29, 95]},\n          {\"family\": \"dispersion\", \"params\": {\"window\": 10}, \"feature_slice\": [9, 29]}\n        ],\n        \"weights\": [1.0, 1.0, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Hurst-LeadLag-Drawdown Concat\",\n      \"rationale\": \"Hurst exponent (29-95) measures long memory, lead-lag beta (95-158) captures cross-sectional lead-lag, drawdown (9-29) captures downside risk; diverse temporal scales.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"hurst_vr\", \"params\": {\"window\": 20}, \"feature_slice\": [29, 95]},\n          {\"family\": \"lead_lag_beta\", \"params\": {\"window\": 12}, \"feature_slice\": [95, 158]},\n          {\"family\": \"drawdown\", \"params\": {\"window\": 10}, \"feature_slice\": [9, 29]}\n        ],\n        \"weights\": [1.1, 1.0, 0.8]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Regime-Tail-Volume Concat\",\n      \"rationale\": \"Regime transition (29-95) captures volatility regimes, tail asymmetry (29-95) captures skewness, volume-weighted volatility (95-158) captures order-flow; complementary risk factors.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"regime_transition\", \"params\": {\"window\": 15}, \"feature_slice\": [29, 95]},\n          {\"family\": \"tail_asymmetry\", \"params\": {\"window\": 10}, \"feature_slice\": [29, 95]},\n          {\"family\": \"volatility\", \"params\": {\"window\": 5}, \"feature_slice\": [95, 158]}\n        ],\n        \"weights\": [1.0, 1.1, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Autocorr-Momentum-Dispersion Mix\",\n      \"rationale\": \"Autocorrelation (9-29) captures short-term reversal, momentum (29-95) captures trend, dispersion (29-95) captures cross-sectional spread; mix balances scales.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"autocorr\", \"params\": {\"window\": 5}, \"feature_slice\": [9, 29]},\n          {\"family\": \"momentum\", \"params\": {\"window\": 12}, \"feature_slice\": [29, 95]},\n          {\"family\": \"dispersion\", \"params\": {\"window\": 10}, \"feature_slice\": [29, 95]}\n        ],\n        \"weights\": [1.0, 1.2, 0.8]\n      }\n    },\n    {\n      \"kind\": \"symbolic\",\n      \"name\": \"Multi-Scale Vol-Trend-Volume Symbolic\",\n      \"rationale\": \"Combine short-term volatility (5), medium-term trend (12), and volume-price correlation (10) via symbolic channels to capture interactions between risk, trend, and order flow.\",\n      \"descriptor\": {\n        \"family\": \"symbolic\",\n        \"params\": {\"window\": 12},\n        \"channels\": [\n          {\"time_op\": \"std\", \"feature_op\": \"mean\", \"window\": 5, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 1.0},\n          {\"time_op\": \"slope\", \"feature_op\": \"mean\", \"window\": 12, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"tanh\", \"weight\": 1.2},\n          {\"time_op\": \"corr\", \"feature_op\": \"corr_half\", \"window\": 10, \"feature_slice\": [95, 158], \"interaction\": \"corr\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"mean\", \"rhs_window\": 10, \"transform\": \"identity\", \"weight\": 0.9}\n        ]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Candle-Volume-Momentum Mix\",\n      \"rationale\": \"Candlestick body (0-9) captures intraday sentiment, volume imbalance (95-158) captures order flow, momentum (29-95) captures trend; mix kernel.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"trend\", \"params\": {\"window\": 8}, \"feature_slice\": [0, 9]},\n          {\"family\": \"vol_price_corr\", \"params\": {\"window\": 12}, \"feature_slice\": [95, 158]},\n          {\"family\": \"momentum\", \"params\": {\"window\": 10}, \"feature_slice\": [29, 95]}\n        ],\n        \"weights\": [0.9, 1.1, 1.2]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"PathEff-Semivar-Tail Concat\",\n      \"rationale\": \"Path efficiency (29-95) and semivariance asymmetry (29-95) capture trend quality and risk asymmetry, tail asymmetry (29-95) captures extreme moves; concat preserves diversity.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"path_efficiency\", \"params\": {\"window\": 10}, \"feature_slice\": [29, 95]},\n          {\"family\": \"semivar_ratio\", \"params\": {\"window\": 15}, \"feature_slice\": [29, 95]},\n          {\"family\": \"tail_asymmetry\", \"params\": {\"window\": 8}, \"feature_slice\": [29, 95]}\n        ],\n        \"weights\": [1.0, 1.1, 0.8]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"LeadLag-Vol-Drawdown Mix\",\n      \"rationale\": \"Lead-lag beta (95-158) captures cross-sectional lead-lag, volatility (9-29) captures short-term risk, drawdown (29-95) captures downside; mix balances scales.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"lead_lag_beta\", \"params\": {\"window\": 10}, \"feature_slice\": [95, 158]},\n          {\"family\": \"volatility\", \"params\": {\"window\": 5}, \"feature_slice\": [9, 29]},\n          {\"family\": \"drawdown\", \"params\": {\"window\": 12}, \"feature_slice\": [29, 95]}\n        ],\n        \"weights\": [1.1, 1.0, 0.9]\n      }\n    },\n    {\n      \"kind\": \"symbolic\",\n      \"name\": \"Candle-OrderFlow Interaction Symbolic\",\n      \"rationale\": \"Candlestick morphology interacts with order-flow imbalance via ratio and lead-lag correlation channels; captures intraday sentiment-volume coupling.\",\n      \"descriptor\": {\n        \"family\": \"symbolic\",\n        \"params\": {\"window\": 10},\n        \"channels\": [\n          {\"time_op\": \"mean\", \"feature_op\": \"mean\", \"window\": 5, \"feature_slice\": [0, 9], \"interaction\": \"ratio\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"std\", \"rhs_window\": 5, \"transform\": \"tanh\", \"weight\": 1.0},\n          {\"time_op\": \"slope\", \"feature_op\": \"mean\", \"window\": 10, \"feature_slice\": [0, 9], \"interaction\": \"lead_lag_corr\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"mean\", \"rhs_window\": 10, \"transform\": \"identity\", \"weight\": 1.1},\n          {\"time_op\": \"autocorr_1\", \"feature_op\": \"mean\", \"window\": 8, \"feature_slice\": [0, 9], \"interaction\": \"product\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"mean\", \"rhs_window\": 8, \"transform\": \"abs\", \"weight\": 0.9}\n        ]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Hurst-Momentum-Volume Concat\",\n      \"rationale\": \"Hurst exponent (29-95) measures long memory, momentum (9-29) captures short-term trend, volume-weighted volatility (95-158) captures order-flow risk; diverse scales.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"hurst_vr\", \"params\": {\"window\": 20}, \"feature_slice\": [29, 95]},\n          {\"family\": \"momentum\", \"params\": {\"window\": 5}, \"feature_slice\": [9, 29]},\n          {\"family\": \"volatility\", \"params\": {\"window\": 12}, \"feature_slice\": [95, 158]}\n        ],\n        \"weights\": [1.2, 1.0, 0.8]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Regime-Autocorr-Trend Mix\",\n      \"rationale\": \"Regime transition (29-95) captures volatility regimes, autocorrelation (9-29) captures short-term reversal, trend (29-95) captures persistence; mix kernel.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"regime_transition\", \"params\": {\"window\": 15}, \"feature_slice\": [29, 95]},\n          {\"family\": \"autocorr\", \"params\": {\"window\": 5}, \"feature_slice\": [9, 29]},\n          {\"family\": \"trend\", \"params\": {\"window\": 10}, \"feature_slice\": [29, 95]}\n        ],\n        \"weights\": [1.0, 1.1, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Tail-Vol-PriceCorr Concat\",\n      \"rationale\": \"Tail asymmetry (29-95) captures skewness, volatility (29-95) captures risk, price-volume correlation (95-158) captures order-flow; complementary.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"tail_asymmetry\", \"params\": {\"window\": 12}, \"feature_slice\": [29, 95]},\n          {\"family\": \"volatility\", \"params\": {\"window\": 5}, \"feature_slice\": [29, 95]},\n          {\"family\": \"vol_price_corr\", \"params\": {\"window\": 8}, \"feature_slice\": [95, 158]}\n        ],\n        \"weights\": [1.1, 1.0, 0.9]\n      }\n    },\n    {\n      \"kind\": \"symbolic\",\n      \"name\": \"Multi-Slice Momentum-Vol Symbolic\",\n      \"rationale\": \"Combine momentum (9-29), volatility (29-95), and volume (95-158) with diff and ratio interactions to capture cross-slice dynamics.\",\n      \"descriptor\": {\n        \"family\": \"symbolic\",\n        \"params\": {\"window\": 12},\n        \"channels\": [\n          {\"time_op\": \"slope\", \"feature_op\": \"mean\", \"window\": 10, \"feature_slice\": [9, 29], \"interaction\": \"diff\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"mean\", \"rhs_window\": 10, \"transform\": \"tanh\", \"weight\": 1.0},\n          {\"time_op\": \"std\", \"feature_op\": \"std\", \"window\": 5, \"feature_slice\": [29, 95], \"interaction\": \"ratio\", \"rhs_slice\": [95, 158], \"rhs_time_op\": \"mean\", \"rhs_window\": 5, \"transform\": \"identity\", \"weight\": 1.1},\n          {\"time_op\": \"ema_diff\", \"feature_op\": \"mean\", \"window\": 8, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 0.9}\n        ]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Drawdown-PathEff-Dispersion Concat\",\n      \"rationale\": \"Drawdown (9-29) captures downside, path efficiency (29-95) captures trend quality, dispersion (29-95) captures cross-sectional spread; diverse risk measures.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"drawdown\", \"params\": {\"window\": 8}, \"feature_slice\": [9, 29]},\n          {\"family\": \"path_efficiency\", \"params\": {\"window\": 12}, \"feature_slice\": [29, 95]},\n          {\"family\": \"dispersion\", \"params\": {\"window\": 10}, \"feature_slice\": [29, 95]}\n        ],\n        \"weights\": [1.0, 1.1, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"LeadLag-Semivar-Volume Mix\",\n      \"rationale\": \"Lead-lag beta (95-158) captures cross-sectional lead-lag, semivariance asymmetry (29-95) captures risk asymmetry, volume (95-158) captures order-flow; mix kernel.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"lead_lag_beta\", \"params\": {\"window\": 12}, \"feature_slice\": [95, 158]},\n          {\"family\": \"semivar_ratio\", \"params\": {\"window\": 10}, \"feature_slice\": [29, 95]},\n          {\"family\": \"volatility\", \"params\": {\"window\": 5}, \"feature_slice\": [95, 158]}\n        ],\n        \"weights\": [1.1, 1.0, 0.8]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Candle-Hurst-Vol Concat\",\n      \"rationale\": \"Candlestick trend (0-9) captures intraday sentiment, Hurst exponent (29-95) captures long memory, volatility (29-95) captures risk; diverse.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"trend\", \"params\": {\"window\": 5}, \"feature_slice\": [0, 9]},\n          {\"family\": \"hurst_vr\", \"params\": {\"window\": 20}, \"feature_slice\": [29, 95]},\n          {\"family\": \"volatility\", \"params\": {\"window\": 10}, \"feature_slice\": [29, 95]}\n        ],\n        \"weights\": [0.9, 1.2, 1.0]\n      }\n    },\n    {\n      \"kind\": \"symbolic\",\n      \"name\": \"Autocorr-Regime-Tail Symbolic\",\n      \"rationale\": \"Autocorrelation (9-29), regime transition (29-95), and tail asymmetry (29-95) capture reversal, regime shifts, and skewness; symbolic interactions enhance rank.\",\n      \"descriptor\": {\n        \"family\": \"symbolic\",\n        \"params\": {\"window\": 12},\n        \"channels\": [\n          {\"time_op\": \"autocorr_1\", \"feature_op\": \"mean\", \"window\": 5, \"feature_slice\": [9, 29], \"interaction\": \"none\", \"transform\": \"tanh\", \"weight\": 1.0},\n          {\"time_op\": \"std\", \"feature_op\": \"std\", \"window\": 10, \"feature_slice\": [29, 95], \"interaction\": \"diff\", \"rhs_slice\": [9, 29], \"rhs_time_op\": \"mean\", \"rhs_window\": 10, \"transform\": \"identity\", \"weight\": 1.1},\n          {\"time_op\": \"skew\", \"feature_op\": \"mean\", \"window\": 8, \"feature_slice\": [29, 95], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 0.9}\n        ]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Momentum-Vol-PriceCorr Mix\",\n      \"rationale\": \"Momentum (29-95), volatility (29-95), and price-volume correlation (95-158) capture trend, risk, and order-flow; mix kernel balances scales.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"momentum\", \"params\": {\"window\": 12}, \"feature_slice\": [29, 95]},\n          {\"family\": \"volatility\", \"params\": {\"window\": 5}, \"feature_slice\": [29, 95]},\n          {\"family\": \"vol_price_corr\", \"params\": {\"window\": 10}, \"feature_slice\": [95, 158]}\n        ],\n        \"weights\": [1.2, 1.0, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Regime-LeadLag-Drawdown Concat\",\n      \"rationale\": \"Regime transition (29-95), lead-lag beta (95-158), and drawdown (9-29) capture regime shifts, cross-sectional lead-lag, and downside risk.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"regime_transition\", \"params\": {\"window\": 15}, \"feature_slice\": [29, 95]},\n          {\"family\": \"lead_lag_beta\", \"params\": {\"window\": 10}, \"feature_slice\": [95, 158]},\n          {\"family\": \"drawdown\", \"params\": {\"window\": 8}, \"feature_slice\": [9, 29]}\n        ],\n        \"weights\": [1.0, 1.1, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"PathEff-Tail-Volume Mix\",\n      \"rationale\": \"Path efficiency (29-95), tail asymmetry (29-95), and volume-weighted volatility (95-158) capture trend quality, skewness, and order-flow risk.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"path_efficiency\", \"params\": {\"window\": 10}, \"feature_slice\": [29, 95]},\n          {\"family\": \"tail_asymmetry\", \"params\": {\"window\": 12}, \"feature_slice\": [29, 95]},\n          {\"family\": \"volatility\", \"params\": {\"window\": 5}, \"feature_slice\": [95, 158]}\n        ],\n        \"weights\": [1.0, 1.1, 0.8]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Hurst-Autocorr-Dispersion Concat\",\n      \"rationale\": \"Hurst exponent (29-95), autocorrelation (9-29), and dispersion (29-95) capture long memory, short-term reversal, and cross-sectional spread.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"hurst_vr\", \"params\": {\"window\": 20}, \"feature_slice\": [29, 95]},\n          {\"family\": \"autocorr\", \"params\": {\"window\": 5}, \"feature_slice\": [9, 29]},\n          {\"family\": \"dispersion\", \"params\": {\"window\": 10}, \"feature_slice\": [29, 95]}\n        ],\n        \"weights\": [1.2, 1.0, 0.9]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Candle-Trend-Semivar Mix\",\n      \"rationale\": \"Candlestick trend (0-9), trend R^2 (29-95), and semivariance asymmetry (29-95) capture intraday sentiment, persistence, and risk asymmetry.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"mix\",\n        \"parts\": [\n          {\"family\": \"trend\", \"params\": {\"window\": 5}, \"feature_slice\": [0, 9]},\n          {\"family\": \"trend\", \"params\": {\"window\": 12}, \"feature_slice\": [29, 95]},\n          {\"family\": \"semivar_ratio\", \"params\": {\"window\": 10}, \"feature_slice\": [29, 95]}\n        ],\n        \"weights\": [0.9, 1.2, 1.0]\n      }\n    },\n    {\n      \"kind\": \"symbolic\",\n      \"name\": \"Volume-Momentum-Candle Symbolic\",\n      \"rationale\": \"Volume (95-158), momentum (29-95), and candlestick (0-9) interact via ratio and product to capture volume-driven momentum and sentiment.\",\n      \"descriptor\": {\n        \"family\": \"symbolic\",\n        \"params\": {\"window\": 10},\n        \"channels\": [\n          {\"time_op\": \"mean\", \"feature_op\": \"mean\", \"window\": 5, \"feature_slice\": [95, 158], \"interaction\": \"ratio\", \"rhs_slice\": [29, 95], \"rhs_time_op\": \"mean\", \"rhs_window\": 5, \"transform\": \"tanh\", \"weight\": 1.0},\n          {\"time_op\": \"slope\", \"feature_op\": \"mean\", \"window\": 10, \"feature_slice\": [29, 95], \"interaction\": \"product\", \"rhs_slice\": [0, 9], \"rhs_time_op\": \"mean\", \"rhs_window\": 10, \"transform\": \"identity\", \"weight\": 1.1},\n          {\"time_op\": \"std\", \"feature_op\": \"std\", \"window\": 8, \"feature_slice\": [95, 158], \"interaction\": \"none\", \"transform\": \"identity\", \"weight\": 0.9}\n        ]\n      }\n    },\n    {\n      \"kind\": \"composite\",\n      \"name\": \"Vol-PriceCorr-Drawdown Concat\",\n      \"rationale\": \"Volatility (29-95), price-volume correlation (95-158), and drawdown (9-29) capture risk, order-flow, and downside; complementary.\",\n      \"descriptor\": {\n        \"family\": \"composite\",\n        \"combine\": \"concat\",\n        \"parts\": [\n          {\"family\": \"volatility\", \"params\": {\"window\": 5}, \"feature_slice\": [29, 95]},\n          {\"family\": \"vol_price_corr\", \"params\": {\"window\": 10}, \"feature_slice\": [95, 158]},\n          {\"family\": \"drawdown\", \"params\": {\"window\": 8}, \"feature_slice\": [9, 29]}\n        ],\n        \"weights\": [1.0, 1.1, 0.9]\n      }\n    }\n  ]\n}",
+  "system_prompt": "You are an autonomous Quantitative Financial AI Scientist in PredicateLab (TSIL domain).\nYour objective is to construct mathematically rigorous relational predicates P(X) for the LUSI (Learning Using Statistical Invariants) loss on the CSI300 daily Alpha158 stock panel:\n    L(y, y_hat) = tau_hat * ||y - y_hat||_I^2 + tau * (y - y_hat)^T P(X) (y - y_hat)\nwhere batch_x has shape [B, T=20, F=158], phi(X) in R^(B x d) is standardized per column and normalized to unit Frobenius norm, and P(X) = phi_hat(X) @ phi_hat(X)^T.\n\nCRITICAL SCIENTIFIC & MATHEMATICAL CONSTRAINTS:\n1. Non-Collapse / High Effective Rank Gate:\n   Every candidate is tested on a real CSI300 batch before training. If participation-ratio effective rank r_eff(P) = (tr(P))^2 / ||P||_F^2 < 1.25 or off-diagonal cosine alignment with 11^T/B > 0.98, the kernel collapses to the trivial global shrinkage control (`control:ones`) and is REJECTED.\n   Therefore, design descriptors with d >= 3 diverse, weakly correlated dimensions!\n2. Beat Both MSE Baseline and `control:ones`:\n   A candidate is only validated if paired Delta_IC > min_effect, its 95% block-bootstrap CI lower bound > 0, AND it outperforms `control:ones`.\n3. Alpha158 Feature Subspace Map (feature_dim=158, valid slice [start, end] with 0 <= start < end <= 158 and end - start >= 2):\n   - [0, 9]: KBar intraday candlestick morphology (body, upper/lower shadow, shift)\n   - [9, 29]: Raw price/VWAP channels across short lags\n   - [29, 95]: Rolling return, momentum, trend R^2, volatility, skewness, rank, support/resistance\n   - [95, 158]: Volume, order-flow imbalance, volume-weighted volatility, price-volume correlation\n\nALLOWED DESCRIPTOR SCHEMAS (Pure JSON data, no Python code):\n\nSchema A — Novel LLM-Constructed Symbolic Tensor Predicate (`family: \"symbolic\"`, `kind: \"statistical\" | \"relational\" | \"soft\"`):\n{\n  \"kind\": \"statistical\",\n  \"name\": \"concise descriptive name\",\n  \"rationale\": \"financial & statistical hypothesis explaining why this kernel aligns residuals\",\n  \"parents\": [\"optional_parent_candidate_id\"],\n  \"descriptor\": {\n    \"family\": \"symbolic\",\n    \"params\": {\"window\": 12},\n    \"channels\": [\n      {\n        \"time_op\": \"one of: mean|std|slope|accel|ema_diff|max_drawdown|semivar_asymmetry|skew|kurt|q_spread|autocorr_1|hurst_proxy|path_efficiency\",\n        \"feature_op\": \"one of: mean|std|max|min|iqr|l2_norm|top_bottom_spread|corr_half\",\n        \"window\": 10,\n        \"feature_slice\": [29, 95],\n        \"interaction\": \"one of: none|diff|ratio|product|corr|beta|lead_lag_corr\",\n        \"rhs_slice\": [95, 158],\n        \"rhs_time_op\": \"optional time_op when interaction in diff|ratio|product\",\n        \"rhs_window\": 15,\n        \"transform\": \"one of: identity|abs|tanh|sign_sqrt\",\n        \"weight\": 1.0\n      }\n      // MUST include between 3 and 6 distinct channel objects in `channels`\n    ]\n  }\n}\n\nSchema B — Atomic Mathematical Operator Predicate (`kind: \"statistical\" | \"soft\" | \"relational\"`):\n- Allowed `family`: \"semivar_ratio\" | \"vol_price_corr\" | \"path_efficiency\" | \"hurst_vr\" | \"lead_lag_beta\" | \"regime_transition\" | \"tail_asymmetry\" | \"momentum\" | \"volatility\" | \"dispersion\" | \"autocorr\" | \"drawdown\" | \"tail\" | \"trend\"\n- `params`: {\"window\": integer in [3, 20]}\n- Optional `feature_slice`: [start, end]\n\nSchema C — DSL-Composed Multi-Mechanism Predicate (`family: \"composite\"`, `kind: \"composite\"`):\n{\n  \"kind\": \"composite\",\n  \"name\": \"concise composite name\",\n  \"rationale\": \"why combining these mechanisms improves cross-sectional IC ranking\",\n  \"parents\": [\"optional_parent_candidate_id\"],\n  \"descriptor\": {\n    \"family\": \"composite\",\n    \"combine\": \"concat\",  // \"concat\" (for DSL/symbolic parts) or \"mix\" (kernel convex combination, required if any part is family=\"native\")\n    \"parts\": [ /* 2 to 4 valid Schema A or Schema B (or native) descriptor dicts */ ],\n    \"weights\": [1.2, 1.0, 0.8]  // positive floats in (0, 10], same length as parts\n  }\n}\n\nMODE DIRECTIVE FOR THIS RUN:\nFocus primarily (>= 75% of proposals) on DSL-COMPOSED PREDICATES (`family: \"composite\"` with `combine: \"concat\"` or `\"mix\"`, combining 2..4 complementary sub-descriptors across distinct windows and Alpha158 feature slices `[start, end]`).\n\nReturn strictly a JSON object with keys:\n{\n  \"round_analysis\": \"concise synthesis of empirical evidence and hypothesis strategy for this round\",\n  \"proposals\": [ /* list of 26 candidate objects */ ]\n}",
+  "user_prompt": "Round Index: 0\nTarget Valid Proposals Needed: 20 (please output 26 diverse proposals so we have buffer after deduplication).\nTask Question: Under an identical LSTM, identical folds and an identical training budget, do LLM-constructed predicates (novel symbolic tensor formulas and DSL compositions) improve daily cross-sectional IC relative to plain MSE, the Phi_ones control, and a deterministic rule-based DSL search?\nAlready Evaluated Template Count: 0\n\nThis is Round 0 (Initial Discovery). No prior empirical feedback is available yet. Construct a diverse, high-rank initial portfolio spanning short/medium/long windows (3..20) and distinct Alpha158 feature subspaces."
+}

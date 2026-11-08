@@ -1,0 +1,23 @@
+[38661:MainThread](2026-11-08 17:00:11,744) INFO - qlib.Initialization - [config.py:420] - default_conf: client.
+[38661:MainThread](2026-11-08 17:00:11,945) INFO - qlib.Initialization - [__init__.py:74] - qlib successfully initialized based on client settings.
+[38661:MainThread](2026-11-08 17:00:11,945) INFO - qlib.Initialization - [__init__.py:76] - data_path={'__DEFAULT_FREQ': PosixPath('/home/zhengzengrong/.qlib/qlib_data/cn_data')}
+[38661:MainThread](2026-11-08 17:00:24,053) INFO - qlib.timer - [log.py:127] - Time cost: 12.036s | Loading data Done
+[38661:MainThread](2026-11-08 17:00:29,404) INFO - qlib.timer - [log.py:127] - Time cost: 4.672s | RobustZScoreNorm Done
+[38661:MainThread](2026-11-08 17:00:29,911) INFO - qlib.timer - [log.py:127] - Time cost: 0.506s | Fillna Done
+[38661:MainThread](2026-11-08 17:00:30,631) INFO - qlib.timer - [log.py:127] - Time cost: 0.183s | DropnaLabel Done
+/home/zhengzengrong/miniconda3/envs/predicatelab/lib/python3.11/site-packages/qlib/data/dataset/processor.py:363: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df[cols] = t
+[38661:MainThread](2026-11-08 17:00:30,740) INFO - qlib.timer - [log.py:127] - Time cost: 0.108s | CSRankNorm Done
+[38661:MainThread](2026-11-08 17:00:30,773) INFO - qlib.timer - [log.py:127] - Time cost: 6.718s | fit & process data Done
+[38661:MainThread](2026-11-08 17:00:30,773) INFO - qlib.timer - [log.py:127] - Time cost: 18.756s | Init data Done
+/home/zhengzengrong/PredicateLab/Predicate_Lab_v1.1/TSIL-main/src/dataset_ori_onehot.py:242: FutureWarning: the convert_dtype parameter is deprecated and will be removed in a future version.  Do ``ser.astype(object).apply()`` instead if you want ``convert_dtype=False``.
+  df_stamp['dayofweek'] = df_stamp.datetime.apply(lambda row: row.weekday(), 1)
+/home/zhengzengrong/PredicateLab/Predicate_Lab_v1.1/TSIL-main/src/dataset_ori_onehot.py:243: FutureWarning: the convert_dtype parameter is deprecated and will be removed in a future version.  Do ``ser.astype(object).apply()`` instead if you want ``convert_dtype=False``.
+  df_stamp['dayofmonth'] = df_stamp.datetime.apply(lambda row: row.day, 1)
+/home/zhengzengrong/PredicateLab/Predicate_Lab_v1.1/TSIL-main/src/dataset_ori_onehot.py:244: FutureWarning: the convert_dtype parameter is deprecated and will be removed in a future version.  Do ``ser.astype(object).apply()`` instead if you want ``convert_dtype=False``.
+  df_stamp['dayofyear'] = df_stamp.datetime.apply(lambda row: row.timetuple().tm_yday, 1)
+[worker] success -> artifacts/tsil_llm_dsl_composite/_probe_batches/4b8a673e5adb0ec3c40d8fac/f2022.result.json

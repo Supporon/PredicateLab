@@ -1,0 +1,45 @@
+[67014:MainThread](2026-11-08 19:06:24,899) INFO - qlib.Initialization - [config.py:420] - default_conf: client.
+[67014:MainThread](2026-11-08 19:06:25,155) INFO - qlib.Initialization - [__init__.py:74] - qlib successfully initialized based on client settings.
+[67014:MainThread](2026-11-08 19:06:25,156) INFO - qlib.Initialization - [__init__.py:76] - data_path={'__DEFAULT_FREQ': PosixPath('/home/zhengzengrong/.qlib/qlib_data/cn_data')}
+[67014:MainThread](2026-11-08 19:07:27,398) INFO - qlib.timer - [log.py:127] - Time cost: 62.204s | Loading data Done
+[67014:MainThread](2026-11-08 19:07:32,436) INFO - qlib.timer - [log.py:127] - Time cost: 4.133s | RobustZScoreNorm Done
+[67014:MainThread](2026-11-08 19:07:32,995) INFO - qlib.timer - [log.py:127] - Time cost: 0.559s | Fillna Done
+[67014:MainThread](2026-11-08 19:07:33,710) INFO - qlib.timer - [log.py:127] - Time cost: 0.196s | DropnaLabel Done
+/home/zhengzengrong/miniconda3/envs/predicatelab/lib/python3.11/site-packages/qlib/data/dataset/processor.py:363: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df[cols] = t
+[67014:MainThread](2026-11-08 19:07:33,814) INFO - qlib.timer - [log.py:127] - Time cost: 0.104s | CSRankNorm Done
+[67014:MainThread](2026-11-08 19:07:33,850) INFO - qlib.timer - [log.py:127] - Time cost: 6.452s | fit & process data Done
+[67014:MainThread](2026-11-08 19:07:33,851) INFO - qlib.timer - [log.py:127] - Time cost: 68.657s | Init data Done
+[67014:MainThread](2026-11-08 19:07:36,775) INFO - qlib.Qniverse - [model_backbone_phitp.py:200] - Qniverse Model...
+[67014:MainThread](2026-11-08 19:07:37,380) INFO - qlib.Qniverse - [model_backbone_phitp.py:210] - # model params: 33570
+[67014:MainThread](2026-11-08 19:07:47,312) INFO - qlib.Qniverse - [model_backbone_phitp.py:646] - Epoch 0:
+[67014:MainThread](2026-11-08 19:07:47,313) INFO - qlib.Qniverse - [model_backbone_phitp.py:648] - training...
+[67014:MainThread](2026-11-08 19:08:05,640) INFO - qlib.Qniverse - [model_backbone_phitp.py:651] - evaluating...
+[67014:MainThread](2026-11-08 19:08:06,721) INFO - qlib.Qniverse - [model_backbone_phitp.py:658] - 	valid metrics: {'InfT': 0.0007026968775568781, 'MSE': 0.9987443089485168, 'MAE': 0.8647216558456421, 'IC': 0.015400804224598235, 'Rank_IC': 0.013625851101613724, 'n_dates': 97, 'n_samples': 29069}
+[67014:MainThread](2026-11-08 19:08:06,729) INFO - qlib.Qniverse - [model_backbone_phitp.py:668] - 	valid ic increased: 1.0154008042245983
+[67014:MainThread](2026-11-08 19:08:06,731) INFO - qlib.Qniverse - [model_backbone_phitp.py:646] - Epoch 1:
+[67014:MainThread](2026-11-08 19:08:06,731) INFO - qlib.Qniverse - [model_backbone_phitp.py:648] - training...
+[67014:MainThread](2026-11-08 19:08:24,614) INFO - qlib.Qniverse - [model_backbone_phitp.py:651] - evaluating...
+[67014:MainThread](2026-11-08 19:08:25,726) INFO - qlib.Qniverse - [model_backbone_phitp.py:658] - 	valid metrics: {'InfT': 0.0007185807099213471, 'MSE': 0.9984967112541199, 'MAE': 0.864241898059845, 'IC': 0.029032053820879825, 'Rank_IC': 0.023712061643556742, 'n_dates': 97, 'n_samples': 29069}
+[67014:MainThread](2026-11-08 19:08:25,735) INFO - qlib.Qniverse - [model_backbone_phitp.py:668] - 	valid ic increased: 0.01363124959628159
+[67014:MainThread](2026-11-08 19:08:25,737) INFO - qlib.Qniverse - [model_backbone_phitp.py:646] - Epoch 2:
+[67014:MainThread](2026-11-08 19:08:25,737) INFO - qlib.Qniverse - [model_backbone_phitp.py:648] - training...
+[67014:MainThread](2026-11-08 19:08:42,829) INFO - qlib.Qniverse - [model_backbone_phitp.py:651] - evaluating...
+[67014:MainThread](2026-11-08 19:08:43,783) INFO - qlib.Qniverse - [model_backbone_phitp.py:658] - 	valid metrics: {'InfT': 0.000660722320144241, 'MSE': 0.9985804557800293, 'MAE': 0.8640572428703308, 'IC': 0.031069451110197956, 'Rank_IC': 0.027234908560637604, 'n_dates': 97, 'n_samples': 29069}
+[67014:MainThread](2026-11-08 19:08:43,794) INFO - qlib.Qniverse - [model_backbone_phitp.py:668] - 	valid ic increased: 0.0020373972893181318
+[67014:MainThread](2026-11-08 19:08:43,795) INFO - qlib.Qniverse - [model_backbone_phitp.py:646] - Epoch 3:
+[67014:MainThread](2026-11-08 19:08:43,796) INFO - qlib.Qniverse - [model_backbone_phitp.py:648] - training...
+[67014:MainThread](2026-11-08 19:08:58,983) INFO - qlib.Qniverse - [model_backbone_phitp.py:651] - evaluating...
+[67014:MainThread](2026-11-08 19:08:59,908) INFO - qlib.Qniverse - [model_backbone_phitp.py:658] - 	valid metrics: {'InfT': 0.0006755364907754434, 'MSE': 0.9998133778572083, 'MAE': 0.8638601303100586, 'IC': 0.03585070624313433, 'Rank_IC': 0.03067274468003403, 'n_dates': 97, 'n_samples': 29069}
+[67014:MainThread](2026-11-08 19:08:59,911) INFO - qlib.Qniverse - [model_backbone_phitp.py:668] - 	valid ic increased: 0.004781255132936372
+[67014:MainThread](2026-11-08 19:08:59,913) INFO - qlib.Qniverse - [model_backbone_phitp.py:646] - Epoch 4:
+[67014:MainThread](2026-11-08 19:08:59,913) INFO - qlib.Qniverse - [model_backbone_phitp.py:648] - training...
+[67014:MainThread](2026-11-08 19:09:13,703) INFO - qlib.Qniverse - [model_backbone_phitp.py:651] - evaluating...
+[67014:MainThread](2026-11-08 19:09:14,534) INFO - qlib.Qniverse - [model_backbone_phitp.py:658] - 	valid metrics: {'InfT': 0.0012109021882753114, 'MSE': 1.0019596815109253, 'MAE': 0.8642885088920593, 'IC': 0.0319373780552487, 'Rank_IC': 0.02766889061660364, 'n_dates': 97, 'n_samples': 29069}
+[67014:MainThread](2026-11-08 19:09:14,537) INFO - qlib.Qniverse - [model_backbone_phitp.py:724] - best score: 0.035851 @ 3
+[67014:MainThread](2026-11-08 19:09:16,660) INFO - qlib.Qniverse - [model_backbone_phitp.py:730] - test metrics: {'InfT': 0.0012060015389088834, 'MSE': 0.9962442517280579, 'MAE': 0.8635151386260986, 'IC': 0.049479099543993474, 'Rank_IC': 0.04425353366740302, 'n_dates': 237, 'n_samples': 71040, 'best_epoch': 3, 'best_score': 0.03585070624313433}
+[worker] success -> artifacts/tsil_tau_k010/run_20261108_110259/trials/screen/f2022/cand_9d7d597ddc95f51d/candidate/seed_2025/01fb269c7d4e/result.json

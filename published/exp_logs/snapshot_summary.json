@@ -1,0 +1,64 @@
+{
+  "experiment": "exp_logs",
+  "files": [
+    "code/analyze_tau.py",
+    "code/progress.py",
+    "code/progress_tau.py",
+    "code/wait_tau.py",
+    "logs/arm_A_novel_symbolic.log",
+    "logs/arm_B_dsl_composite.log",
+    "logs/arm_C_hybrid.log",
+    "logs/arm_D_rule_baseline.log",
+    "logs/tau_k005.log",
+    "logs/tau_k010.log",
+    "logs/tau_k020.log",
+    "logs/tau_k050.log",
+    "logs/tau_learned.log",
+    "results/tau_analysis_20261108.txt",
+    "results/tau_sweep_results_20261108.md",
+    "results/verify_tau_k005.json",
+    "results/verify_tau_k010.json",
+    "results/verify_tau_k020.json",
+    "results/verify_tau_k050.json",
+    "results/verify_tau_learned.json"
+  ],
+  "include": [
+    "results",
+    "logs",
+    "figures",
+    "code"
+  ],
+  "kinds": {
+    "code": {
+      "bytes": 21819,
+      "files": 4
+    },
+    "data": {
+      "bytes": 0,
+      "files": 0
+    },
+    "figures": {
+      "bytes": 0,
+      "files": 0
+    },
+    "logs": {
+      "bytes": 3166,
+      "files": 9
+    },
+    "models": {
+      "bytes": 0,
+      "files": 0
+    },
+    "results": {
+      "bytes": 16432,
+      "files": 7
+    }
+  },
+  "published": {
+    "code": 4,
+    "logs": 9,
+    "results": 7
+  },
+  "schema": "predicatelab.snapshot/1",
+  "source": "/home/zhengzengrong/PredicateLab/Predicate_Lab_v1.1/artifacts/exp_logs"
+}
