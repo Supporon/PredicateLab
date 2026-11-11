@@ -44,6 +44,8 @@ Newey-West HAC、moving-block bootstrap 和 Benjamini-Hochberg FDR。
 - `published/` — 轻量结果快照：`results/`、`logs/`、`figures/`、`code/`，
   含 `MANIFEST.json` 与 `checksums.sha256`（约 18 MB）
 - `TSIL-main/` — 上游实现副本（GPL-3.0）
+- `.git/` — 5 个提交的完整历史；可直接 `git log` 核对 `VERSION.txt` 中的 commit
+  （测试套件中的代码指纹测试依赖 Git 元数据，删除 `.git` 后该项会失败）
 
 **没有（有意排除）：**
 
@@ -195,6 +197,10 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q
 
 `published/checksums.sha256` 校验已发布快照；交付 zip 的 SHA-256 见压缩包
 同目录的 `PredicateLab_v1.1_20261111.zip.sha256`。
+
+包内保留了 `.git/`，所以解压后直接运行应得 `190 passed`。如果你删除了
+`.git/`，`test_stage0_code_version_git_1_8_compatible` 会失败——该测试需要
+读取 commit 与源码树指纹，这是预期行为，不是代码缺陷。
 
 ## 10. 许可与引用
 
