@@ -193,8 +193,8 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q
 # 本包基线：190 passed（无 qlib；TSIL 相关测试会按设计跳过）
 ```
 
-`published/checksums.sha256` 校验已发布快照；交付 zip 的 SHA-256 见随包的
-`VERSION.txt`（若有）。
+`published/checksums.sha256` 校验已发布快照；交付 zip 的 SHA-256 见压缩包
+同目录的 `PredicateLab_v1.1_20261111.zip.sha256`。
 
 ## 10. 许可与引用
 
