@@ -4,6 +4,11 @@
 > synthetic data with an explicit latent truth; they validate the *platform's
 > behaviour* under small n, not any real-world claim.  Read
 > [evidence and limitations](evidence_and_limitations.md) first.
+>
+> The pilot reported in §6–§7 is superseded by a **formal pre-registered
+> study** (1,200 replicates, effect-size grid, two engine seeds):
+> [results](results_small_sample_20261108.md) ·
+> [pre-registration](preregistration_small_sample_20261108.md).
 
 ## 1. Why this scenario exists
 

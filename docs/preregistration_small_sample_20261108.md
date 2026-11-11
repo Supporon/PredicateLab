@@ -170,3 +170,13 @@ afterwards.)
    reported rather than corrected.
 5. The engine stores an `independent_split` confirmation as
    `resampling_confirmed`; the folds are disjoint, so this is conservative.
+
+## 9. Post-run annotations (added after the formal run; not part of the design)
+
+- **2026-11-08, D1:** §2 prose says 40 replicates per null cell, while the frozen
+  §7 command used `--reps 30` for every cell.  The executed grid followed the
+  command (300 null replicates, 298 usable).  Thresholds were not changed;
+  see the results document §4 for the audit.
+- **2026-11-08, D2:** the first execution was interrupted by a concurrent
+  commit to the repository; the whole grid was re-run on the clean commit per
+  §6, and the aborted attempt is preserved for audit.  See results §4.

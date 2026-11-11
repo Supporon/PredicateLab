@@ -130,6 +130,10 @@ Full details: [docs/artifact_layout.md](docs/artifact_layout.md).
   folds, commands, limitations.
 - [TSIL results](docs/results_tsil.md) — historical run.
 - [Generic tabular results](docs/results_tabular.md).
+- [Small-sample scenario](docs/small_sample_scenario.md) and its
+  [formal pre-registered study](docs/results_small_sample_20261108.md) —
+  measured type-I error and power of the discovery→confirmation→holdout gates
+  at n = 24–256.
 - [Extending domains](docs/extending_domains.md) — adapter contract,
   mineral/image reservations, checklist.
 - [Evidence and limitations](docs/evidence_and_limitations.md).
