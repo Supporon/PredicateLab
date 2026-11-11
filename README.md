@@ -137,12 +137,15 @@ Full details: [docs/artifact_layout.md](docs/artifact_layout.md).
 - [Extending domains](docs/extending_domains.md) — adapter contract,
   mineral/image reservations, checklist.
 - [Evidence and limitations](docs/evidence_and_limitations.md).
+- [交付说明 / handover guide (中文)](docs/HANDOVER_zh.md) — what the package
+  contains, how to run it, how to read results, and which claims are not yet
+  supported.
 
 ## Tests
 
 ```bash
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. $PY -m pytest -q
-# 105 passed
+# 190 passed
 ```
 
 (`pytest.ini` disables qlib's optional `fugue_test` plugin, which imports
